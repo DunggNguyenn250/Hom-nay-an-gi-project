@@ -1,0 +1,16 @@
+server:
+  port: ${SERVER_PORT}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME}
+  jpa:
+    hibernate:
+      naming:
+        physical-strategy: ${SPRING_JPA_HIBERNATE_NAMING_PHYSICAL_STRATEGY}
+
+jwt:
+  signerKey: ${JWT_SIGNER_KEY}
