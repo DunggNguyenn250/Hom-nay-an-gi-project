@@ -17,5 +17,13 @@ spring:
     ddl-auto: update
     show-sql: true
 
+  # Cấu hình Redis lồng dưới spring:
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      ssl:
+        enabled: false
+
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
