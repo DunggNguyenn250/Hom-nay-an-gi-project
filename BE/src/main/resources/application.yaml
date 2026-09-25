@@ -11,6 +11,11 @@ spring:
     hibernate:
       naming:
         physical-strategy: ${SPRING_JPA_HIBERNATE_NAMING_PHYSICAL_STRATEGY}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    ddl-auto: update
+    show-sql: true
 
 jwt:
   signerKey: ${JWT_SIGNER_KEY}
