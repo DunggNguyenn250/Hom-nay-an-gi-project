@@ -27,14 +27,14 @@ public class ApplicationInitConfig {
     @Bean
     ApplicationRunner applicationRunner(UserRepository userRepository) {
         return args -> {
-            if (userRepository.findByUsername("admin").isEmpty()) {
-                // Tạo Set kiểu Enum Role (không phải String)
+            // Sử dụng existsByUsername thay vì findByUsername để tránh lỗi 2 results returned
+            if (!userRepository.existsByUsername("admin")) {
                 Set<Role> roles = new HashSet<>();
-                roles.add(Role.ROLE_ADMIN); // hoặc Role.ADMIN tùy theo cách bạn định nghĩa Enum Role
+                roles.add(Role.ROLE_ADMIN);
 
                 User user = User.builder()
                         .username("admin")
-                        .passwordHash(passwordEncoder.encode("admin")) // Sửa lại thành passwordHash
+                        .passwordHash(passwordEncoder.encode("admin"))
                         .status(UserStatus.ACTIVE)
                         .roles(roles)
                         .build();

@@ -33,6 +33,12 @@ public enum ErrorCode {
 
     // === 6. LỖI DỊCH VỤ BÊN NGOÀI (4000 - 4099) ===
     EXTERNAL_SERVICE_ERROR(4001, "Dịch vụ bên thứ ba (Google Maps/VietQR) gặp sự cố", HttpStatus.SERVICE_UNAVAILABLE),
+
+    // === 7. LỖI QUẢN LÝ ĐỊA ĐIỂM (1200 - 1299) ===
+    PLACE_NOT_FOUND(1201, "Địa điểm không tồn tại", HttpStatus.NOT_FOUND),
+    PLACE_NAME_INVALID(1202, "Tên địa điểm không được để trống", HttpStatus.BAD_REQUEST),
+    PLACE_LATITUDE_INVALID(1203, "Vĩ độ không hợp lệ", HttpStatus.BAD_REQUEST),
+    PLACE_LONGITUDE_INVALID(1204, "Kinh độ không hợp lệ", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;
