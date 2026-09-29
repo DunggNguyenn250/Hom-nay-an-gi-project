@@ -112,7 +112,7 @@ public class AuthenticationService {
         // PAYLOAD
         JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
                 .subject(user.getUsername()) // bến tên username vào thẻ
-                .issuer("devteria.com") // Đóng dấu: thẻ do website devteria.com cấp phát
+                .issuer("dungnb.homnayangi.com") // Đóng dấu: thẻ do website devteria.com cấp phát
                 .issueTime(new Date()) // Ghi chú ngày giờ tạo thẻ (ngay bây giờ)
                 .expirationTime(new Date(
                         Instant.now().plus(5, ChronoUnit.HOURS).toEpochMilli()
