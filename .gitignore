@@ -1,0 +1,52 @@
+# ==========================================
+# IDE & Editors
+# ==========================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated
+.sts4-cache
+
+# ==========================================
+# Operating System files
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# Backend (Java / Spring Boot / Maven)
+# ==========================================
+**/target/
+**/build/
+HELP.md
+*.log
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Sensitive application configs (Chứa mật khẩu, secret key cá nhân)
+**/application.yaml
+**/application.yml
+**/application.properties
+!**/application.yaml.example
+!**/application.properties.example
+
+# ==========================================
+# Frontend (React / Vite / Node.js)
+# ==========================================
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.env.local
+.env.*.local
