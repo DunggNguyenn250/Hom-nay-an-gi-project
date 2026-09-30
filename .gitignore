@@ -32,6 +32,13 @@ HELP.md
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Sensitive application configs (Chứa mật khẩu, secret key cá nhân)
+**/application.yaml
+**/application.yml
+**/application.properties
+!**/application.yaml.example
+!**/application.properties.example
+
 # ==========================================
 # Frontend (React / Vite / Node.js)
 # ==========================================
