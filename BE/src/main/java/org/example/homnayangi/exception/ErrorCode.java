@@ -39,6 +39,14 @@ public enum ErrorCode {
     PLACE_NAME_INVALID(1202, "Tên địa điểm không được để trống", HttpStatus.BAD_REQUEST),
     PLACE_LATITUDE_INVALID(1203, "Vĩ độ không hợp lệ", HttpStatus.BAD_REQUEST),
     PLACE_LONGITUDE_INVALID(1204, "Kinh độ không hợp lệ", HttpStatus.BAD_REQUEST),
+
+    // === 8. LỖI BẠN BÈ & SỞ THÍCH (1300 - 1399) ===
+    FRIENDSHIP_ALREADY_EXISTS(1301, "Yêu cầu kết bạn hoặc quan hệ bạn bè đã tồn tại", HttpStatus.BAD_REQUEST),
+    FRIENDSHIP_NOT_FOUND(1302, "Không tìm thấy quan hệ bạn bè", HttpStatus.NOT_FOUND),
+    CANNOT_FRIEND_SELF(1303, "Không thể kết bạn với chính mình", HttpStatus.BAD_REQUEST),
+    TAG_ALREADY_EXISTS(1304, "Tag đã tồn tại", HttpStatus.BAD_REQUEST),
+    TAG_NOT_FOUND(1305, "Tag không tồn tại", HttpStatus.NOT_FOUND),
+    CANNOT_BLOCK_SELF(1306, "Không thể chặn chính mình", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;
