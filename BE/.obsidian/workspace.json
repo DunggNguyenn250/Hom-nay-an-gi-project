@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "testcase.md",
+                "file": "Hom nay an gi.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "testcase"
+              "title": "Hom nay an gi"
             }
           }
         ]
@@ -190,16 +190,17 @@
   },
   "active": "c373ccdc4ace9bab",
   "lastOpenFiles": [
+    "README.md",
+    "target/classes/db/migration/V1__init_database.sql",
+    "target/classes/db/migration",
+    "target/classes/db",
+    "target/classes/application.yaml",
+    "testcase.md",
     "target/test-classes/org/example/homnayangi/HomnayangiApplicationTests.class",
     "target/test-classes/org/example/homnayangi",
     "target/test-classes/org/example",
     "target/test-classes/org",
     "target/test-classes",
-    "target/generated-test-sources/test-annotations",
-    "target/generated-test-sources",
-    "target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst",
-    "target/classes/org/example/homnayangi/exception/GlobalExceptionHandler.class",
-    "target/classes/org/example/homnayangi/exception/AppException.class",
-    "target/classes/org/example/homnayangi/exception/ErrorCode.class"
+    "target/generated-test-sources/test-annotations"
   ]
 }
