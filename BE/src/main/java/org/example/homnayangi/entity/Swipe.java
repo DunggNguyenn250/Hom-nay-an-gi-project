@@ -39,7 +39,7 @@ public class Swipe {
     Place place;
 
     @Column(name = "is_like", nullable = false)
-    boolean like;
+    boolean liked;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

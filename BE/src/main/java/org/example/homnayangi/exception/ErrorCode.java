@@ -26,6 +26,9 @@ public enum ErrorCode {
     ROOM_FULL(2002, "Phòng ăn đã đủ số lượng thành viên", HttpStatus.BAD_REQUEST),
     ROOM_CLOSED(2003, "Phòng ăn này đã đóng hoặc đã chốt đơn", HttpStatus.BAD_REQUEST),
     NOT_ROOM_HOST(2004, "Chỉ có chủ phòng mới có quyền thao tác này", HttpStatus.FORBIDDEN),
+    ROOM_NOT_OPEN(2005, "Phòng này không còn mở để tham gia", HttpStatus.BAD_REQUEST),
+    USER_ALREADY_IN_ROOM(2006, "Bạn đã ở trong phòng này rồi", HttpStatus.BAD_REQUEST),
+    ROOM_NOT_SWIPING(2008, "Phòng này chưa bắt đầu hoặc đã kết thúc quẹt", HttpStatus.BAD_REQUEST),
 
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),
