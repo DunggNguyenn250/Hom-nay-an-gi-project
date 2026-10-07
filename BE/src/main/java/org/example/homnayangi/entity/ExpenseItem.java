@@ -5,6 +5,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -31,4 +33,8 @@ public class ExpenseItem {
 
     @Column(name = "price", nullable = false, precision = 12, scale = 2)
     BigDecimal price;
+
+    @OneToMany(mappedBy = "expenseItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    List<ItemSharer> sharers = new ArrayList<>();
 }

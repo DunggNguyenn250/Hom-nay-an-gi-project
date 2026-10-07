@@ -33,6 +33,13 @@ public enum ErrorCode {
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),
     BILL_AMOUNT_MISMATCH(3002, "Tổng số tiền các cá nhân chia không khớp với Tổng hóa đơn", HttpStatus.BAD_REQUEST),
+    ROOM_NOT_CLOSED(3003, "Phòng ăn phải ở trạng thái CLOSED mới có thể tạo hóa đơn", HttpStatus.BAD_REQUEST),
+    EXPENSE_ALREADY_EXISTS(3004, "Phòng này đã có hóa đơn được tạo rồi", HttpStatus.BAD_REQUEST),
+    SPLIT_NOT_FOUND(3005, "Không tìm thấy khoản chia tiền này", HttpStatus.NOT_FOUND),
+    ALREADY_PAID(3006, "Khoản tiền này đã được thanh toán trước đó", HttpStatus.BAD_REQUEST),
+    NOT_EXPENSE_PAYER(3007, "Chỉ người trả tiền mới có thể thực hiện thao tác này", HttpStatus.FORBIDDEN),
+    INVALID_SPLIT_TYPE(3008, "Kiểu chia tiền không hợp lệ, chỉ chấp nhận EVENLY hoặc BY_ITEM", HttpStatus.BAD_REQUEST),
+    SHARER_NOT_IN_ROOM(3009, "Người chia sẻ món ăn phải là thành viên trong phòng", HttpStatus.BAD_REQUEST),
 
     // === 6. LỖI DỊCH VỤ BÊN NGOÀI (4000 - 4099) ===
     EXTERNAL_SERVICE_ERROR(4001, "Dịch vụ bên thứ ba (Google Maps/VietQR) gặp sự cố", HttpStatus.SERVICE_UNAVAILABLE),
