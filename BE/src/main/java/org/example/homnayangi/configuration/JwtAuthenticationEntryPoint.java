@@ -25,6 +25,8 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(errorCode.getStatusCode().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
+        response.setCharacterEncoding("UTF-8"); // BẮT BUỘC CÓ DÒNG NÀY TRƯỚC GETWRITER()
+
         ApiResponse<?> apiResponse = ApiResponse.builder()
                 .code(errorCode.getCode())
                 .message(errorCode.getMessage())

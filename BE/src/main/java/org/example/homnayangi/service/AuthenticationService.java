@@ -46,32 +46,27 @@ public class AuthenticationService {
     // Xác thực token
     // Mỗi khi client gọi api khác thì không cần phải gửi lại mật khẩu nữa
     // Người dùng chỉ cần đăng nhập 1 lần - lưu lại token ở phía frontend - localStorage
-    public IntrospectResponse introspect(IntrospectRequest request)
-            throws JOSEException, ParseException {
-
-        // lấy token từ request
+    public IntrospectResponse introspect(IntrospectRequest request) {
         var token = request.getToken();
+        boolean isValid = true;
 
-        // token có bị chỉnh sửa hay giả mạo không
-        // verifier - mã bí mật của server
-        JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+        try {
+            JWSVerifier verifier = new MACVerifier(SIGNER_KEY.getBytes());
+            SignedJWT signedJWT = SignedJWT.parse(token);
 
-        // tách chuỗi token
-        // header
-        // payload
-        // signature
-        SignedJWT signedJWT = SignedJWT.parse(token);
+            Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+            var verified = signedJWT.verify(verifier);
 
+            isValid = verified && expirationTime != null && expirationTime.after(new Date());
 
-        // token còn hạn không
-        Date expityTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        } catch (JOSEException | ParseException e) {
+            isValid = false;
+        }
 
-        var verified = signedJWT.verify(verifier);
-
+        // Luôn trả về response dạng này
         return IntrospectResponse.builder()
-                .valid(verified && expityTime.after(new Date()))
+                .valid(isValid)
                 .build();
-
     }
 
     // Đăng nhập và cấp token
