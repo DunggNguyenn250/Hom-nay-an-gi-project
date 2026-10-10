@@ -50,3 +50,4 @@ yarn-error.log*
 .pnpm-debug.log*
 .env.local
 .env.*.local
+graphify-out/
