@@ -62,24 +62,37 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
-                // 2. Cấu hình phân quyền Request
+                // 1. Cấu hình phân quyền Request
                 .authorizeHttpRequests(request ->
-                        // Cho phép truy cập Swagger UI & Static resources không cần login
-                        request.requestMatchers(SWAGGER_ENDPOINTS).permitAll()
-                                // Cho phép truy cập công khai API đăng ký và đăng nhập (POST)
-                                .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
-                                // Tất cả các API còn lại bắt buộc phải xác thực (đã đăng nhập)
-                                .anyRequest().authenticated()
+                                // Cho phép truy cập Swagger UI không cần login
+                                request.requestMatchers(SWAGGER_ENDPOINTS).permitAll()
+
+                                        // Cho phép truy cập công khai API public (POST)
+                                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+
+                                        // Các đường dẫn còn lại cho ADMIN
+                                        .requestMatchers("/api/v1/**").hasRole("ADMIN")
+
+                                        .anyRequest().authenticated()
+
+                        // LƯU Ý: Nếu trong Token của bạn lưu dạng "ROLE_ADMIN" và
+                        // jwtAuthenticationConverter có authorityPrefix là ""
+                        // thì dùng .hasAuthority("ROLE_ADMIN") hoặc .hasRole("ADMIN") đều được.
                 );
 
-        // 3. Cấu hình xác thực JWT
+        // 2. Cấu hình xác thực JWT Resource Server
         httpSecurity.oauth2ResourceServer(oauth2 ->
-                oauth2.jwt(jwtConfigurer -> jwtConfigurer.decoder(jwtDecoder())
-                        .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                oauth2.jwt(jwtConfigurer -> jwtConfigurer
+                                .decoder(jwtDecoder())
+                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
+                        )
+// Bắt lỗi 401 (Chưa đăng nhập / Token sai)
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
+                        // Bắt lỗi 403 (Đã đăng nhập nhưng không đủ quyền Admin)
+                        .accessDeniedHandler(new JwtAccessDeniedHandler())
         );
 
-        // 4. Tắt CSRF
+        // 3. Tắt CSRF
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
         return httpSecurity.build();
