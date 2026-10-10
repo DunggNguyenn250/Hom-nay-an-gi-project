@@ -12,6 +12,8 @@ import java.util.UUID;
 @Repository
 public interface PlaceRepository extends JpaRepository<Place, UUID> {
 
+    boolean existsByName(String name);
+
     List<Place> findByCategoryContainingIgnoreCase(String category);
 
     List<Place> findByNameContainingIgnoreCase(String name);
