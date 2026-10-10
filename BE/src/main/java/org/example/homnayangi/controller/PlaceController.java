@@ -37,10 +37,10 @@ public class PlaceController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false) Double radius) {
+            @RequestParam(required = false, defaultValue = "5.0") Double radius) { // Mặc định 5km
 
         List<PlaceResponse> result;
-        if (latitude != null && longitude != null && radius != null) {
+        if (latitude != null && longitude != null) {
             result = placeService.getNearbyPlaces(latitude, longitude, radius, category);
         } else if (name != null && !name.trim().isEmpty()) {
             result = placeService.searchPlacesByName(name);
