@@ -70,6 +70,9 @@ public class SecurityConfig {
                                         // Cho phép truy cập công khai API public (POST)
                                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
+                                        // Cho phép user xem thông tin của chính mình
+                                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+
                                         // Các đường dẫn còn lại cho ADMIN
                                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 

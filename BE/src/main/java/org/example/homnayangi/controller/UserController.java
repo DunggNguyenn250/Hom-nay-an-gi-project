@@ -40,6 +40,15 @@ public class UserController {
                 .build();
     }
 
+    @GetMapping("/me")
+    public ApiResponse<UserResponse> getMyInfo() {
+        return ApiResponse.<UserResponse>builder()
+                .code(1000)
+                .message("Lấy thông tin tài khoản thành công")
+                .result(userService.getMyInfo())
+                .build();
+    }
+
     @GetMapping("/{userId}")
     public ApiResponse<UserResponse> getUser(@PathVariable UUID userId) {
         return ApiResponse.<UserResponse>builder()
