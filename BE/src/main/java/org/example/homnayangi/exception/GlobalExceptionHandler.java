@@ -1,5 +1,6 @@
 package org.example.homnayangi.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.homnayangi.dto.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -7,12 +8,15 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     // 1. Bắt tất cả các lỗi hệ thống chưa được phân loại
     @ExceptionHandler(value = Exception.class)
     ResponseEntity<ApiResponse<?>> handlingException(Exception exception) {
+        log.error("Unhandled Exception occurred: ", exception);
+
         ErrorCode errorCode = ErrorCode.UNCATEGORIZED_EXCEPTION;
 
         ApiResponse<?> apiResponse = ApiResponse.builder()
@@ -26,6 +30,8 @@ public class GlobalExceptionHandler {
     // 2. Bắt các lỗi nghiệp vụ chủ động throw (AppException)
     @ExceptionHandler(value = AppException.class)
     ResponseEntity<ApiResponse<?>> handlingAppException(AppException exception) {
+        log.warn("Business Exception: {}", exception.getErrorCode().getMessage());
+
         ErrorCode errorCode = exception.getErrorCode();
 
         ApiResponse<?> apiResponse = ApiResponse.builder()

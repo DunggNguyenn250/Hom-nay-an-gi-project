@@ -32,6 +32,15 @@ public class SecurityConfig {
             "/api/v1/swipes/**"
     };
 
+    private final String[] SWAGGER_ENDPOINTS = {
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/swagger-resources/**",
+            "/webjars/**"
+    };
+
     @Value("${jwt.signerKey}")
     private String signerKey;
 
@@ -55,8 +64,10 @@ public class SecurityConfig {
         httpSecurity
                 // 2. Cấu hình phân quyền Request
                 .authorizeHttpRequests(request ->
-                        // Cho phép truy cập công khai API đăng ký và đăng nhập (POST)
-                        request.requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+                        // Cho phép truy cập Swagger UI & Static resources không cần login
+                        request.requestMatchers(SWAGGER_ENDPOINTS).permitAll()
+                                // Cho phép truy cập công khai API đăng ký và đăng nhập (POST)
+                                .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
                                 // Tất cả các API còn lại bắt buộc phải xác thực (đã đăng nhập)
                                 .anyRequest().authenticated()
                 );
