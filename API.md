@@ -699,6 +699,12 @@ Bắt đầu phiên swipe (chỉ host mới có quyền).
 
 ---
 
+Dưới đây là tài liệu API hoàn chỉnh của module **Swipes** đã được bổ sung **2 API `GET**` mới phục vụ cho việc lấy lịch sử quẹt cá nhân và bảng kết quả của cả phòng.
+
+Bạn có thể sao chép trực tiếp tài liệu này để lưu lại test:
+
+---
+
 ## 👆 Swipes
 
 ### `POST /api/v1/swipes` 🔒
@@ -720,6 +726,64 @@ Vuốt thích hoặc không thích một địa điểm trong phòng.
 > **Lưu ý:** Khi tất cả thành viên trong phòng đều `liked = true` cho cùng một địa điểm, phòng tự động chuyển sang `CLOSED` và `matchedPlace` được cập nhật.
 
 ---
+
+### `GET /api/v1/swipes/rooms/{roomId}/me` 🔒
+
+Lấy lịch sử các địa điểm đã quẹt (thích / không thích) của chính người dùng hiện tại trong phòng.
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả                      |
+| -------- | ---- | -------------------------- |
+| `roomId` | UUID | ID của phòng đang tham gia |
+
+**Response (`result`):**
+
+```json
+[
+  {
+    "placeId": "7fa85f64-5717-4562-b3fc-2c963f66afa9",
+    "placeName": "Quán Lẩu Cua Đồng",
+    "liked": true
+  },
+  {
+    "placeId": "8fa85f64-5717-4562-b3fc-2c963f66afb0",
+    "placeName": "Quán Bún Cả Cầu Giấy",
+    "liked": false
+  }
+]
+```
+
+---
+
+### `GET /api/v1/swipes/rooms/{roomId}/results` 🔒
+
+Lấy tổng hợp kết quả bình chọn/quẹt địa điểm của tất cả thành viên trong phòng (được sắp xếp theo số lượt `totalLikes` giảm dần).
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả                         |
+| -------- | ---- | ----------------------------- |
+| `roomId` | UUID | ID của phòng muốn xem kết quả |
+
+**Response (`result`):**
+
+```json
+[
+  {
+    "placeId": "7fa85f64-5717-4562-b3fc-2c963f66afa9",
+    "placeName": "Quán Lẩu Cua Đồng",
+    "totalLikes": 3,
+    "totalDislikes": 0
+  },
+  {
+    "placeId": "8fa85f64-5717-4562-b3fc-2c963f66afb0",
+    "placeName": "Quán Nướng Bò Tơ",
+    "totalLikes": 1,
+    "totalDislikes": 2
+  }
+]
+```
 
 ## 💰 Expenses
 

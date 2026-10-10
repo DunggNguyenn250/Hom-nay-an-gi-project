@@ -1,24 +1,31 @@
 package org.example.homnayangi.service;
 
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.SwipeRequest;
+import org.example.homnayangi.dto.response.RoomPlaceResultResponse;
+import org.example.homnayangi.dto.response.SwipeResponse;
 import org.example.homnayangi.entity.*;
 import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
+import org.example.homnayangi.mapper.SwipeMapper;
 import org.example.homnayangi.repository.*;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SwipeService {
 
     SwipeRepository swipeRepository;
@@ -26,12 +33,12 @@ public class SwipeService {
     UserRepository userRepository;
     PlaceRepository placeRepository;
     RoomMemberRepository roomMemberRepository;
+    SwipeMapper swipeMapper; // 🌟 Tiêm Mapper vào Service
     RedisTemplate<String, Object> redisTemplate;
     PlatformTransactionManager transactionManager;
 
     public void swipe(SwipeRequest request) {
         String lockKey = "lock:room:" + request.getRoomId();
-        // 🌟 TẠO GIÁ TRỊ NHẬN DẠNG RIÊNG CHO THREAD HIỆN TẠI
         String lockValue = UUID.randomUUID().toString();
         boolean acquired = false;
         int retries = 5;
@@ -57,11 +64,7 @@ public class SwipeService {
 
         try {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                var context = SecurityContextHolder.getContext();
-                String name = context.getAuthentication().getName();
-
-                User user = userRepository.findByUsername(name)
-                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+                User user = getCurrentUser();
 
                 Room room = roomRepository.findById(request.getRoomId())
                         .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
@@ -87,12 +90,61 @@ public class SwipeService {
                 }
             });
         } finally {
-            // 🌟 CHỈ XÓA LOCK NẾU GIÁ TRỊ DƯỚI REDIS VẪN LÀ CỦA THREAD NÀY (TRÁNH XÓA NHẦM LOCK)
             Object currentLockValue = redisTemplate.opsForValue().get(lockKey);
             if (lockValue.equals(currentLockValue)) {
                 redisTemplate.delete(lockKey);
             }
         }
+    }
+
+    // 🌟 API 1: Lấy danh sách lượt quẹt cá nhân trong phòng
+    @Transactional(readOnly = true)
+    public List<SwipeResponse> getMySwipesInRoom(UUID roomId) {
+        User currentUser = getCurrentUser();
+
+        // Kiểm tra phòng có tồn tại không
+        if (!roomRepository.existsById(roomId)) {
+            throw new AppException(ErrorCode.ROOM_NOT_FOUND);
+        }
+
+        List<Swipe> userSwipes = swipeRepository.findAllByUserIdAndRoomId(currentUser.getId(), roomId);
+
+        return userSwipes.stream()
+                .map(swipeMapper::toSwipeResponse)
+                .toList();
+    }
+
+    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng
+    @Transactional(readOnly = true)
+    public List<RoomPlaceResultResponse> getRoomSwipeResults(UUID roomId) {
+        if (!roomRepository.existsById(roomId)) {
+            throw new AppException(ErrorCode.ROOM_NOT_FOUND);
+        }
+
+        List<Swipe> allSwipes = swipeRepository.findAllByRoomId(roomId);
+
+        // Gom nhóm theo Place và đếm lượt Like / Dislike
+        Map<Place, List<Swipe>> swipesByPlace = allSwipes.stream()
+                .collect(Collectors.groupingBy(Swipe::getPlace));
+
+        List<RoomPlaceResultResponse> results = new ArrayList<>();
+
+        swipesByPlace.forEach((place, swipes) -> {
+            long totalLikes = swipes.stream().filter(Swipe::isLiked).count();
+            long totalDislikes = swipes.size() - totalLikes;
+
+            results.add(RoomPlaceResultResponse.builder()
+                    .placeId(place.getId())
+                    .placeName(place.getName()) // Thay 'getName()' bằng trường tên tương ứng của Place entity
+                    .totalLikes(totalLikes)
+                    .totalDislikes(totalDislikes)
+                    .build());
+        });
+
+        // Sắp xếp địa điểm được yêu thích nhiều nhất lên đầu
+        results.sort((a, b) -> Long.compare(b.getTotalLikes(), a.getTotalLikes()));
+
+        return results;
     }
 
     private void checkForMatch(Room room, Place place) {
@@ -106,5 +158,15 @@ public class SwipeService {
             room.setStatus(RoomStatus.CLOSED);
             roomRepository.save(room);
         }
+    }
+
+    private User getCurrentUser() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        String username = authentication.getName();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
     }
 }
