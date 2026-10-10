@@ -34,6 +34,8 @@ public class TagService {
     UserRepository userRepository;
     TagMapper tagMapper;
 
+    // === QUẢN LÝ TAG DANH MỤC (ADMIN) ===
+
     public TagResponse createTag(TagRequest request) {
         if (tagRepository.existsByTagName(request.getTagName())) {
             throw new AppException(ErrorCode.TAG_ALREADY_EXISTS);
@@ -57,12 +59,31 @@ public class TagService {
         return tagMapper.toTagResponse(tag);
     }
 
+    // 1. Cập nhật thông tin Tag hệ thống (Admin)
+    public TagResponse updateTag(UUID id, TagRequest request) {
+        Tag tag = tagRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.TAG_NOT_FOUND));
+
+        // Kiểm tra nếu đổi tên tag thành tên đã tồn tại thuộc về ID khác
+        if (!tag.getTagName().equals(request.getTagName())
+                && tagRepository.existsByTagName(request.getTagName())) {
+            throw new AppException(ErrorCode.TAG_ALREADY_EXISTS);
+        }
+
+        // Cập nhật dữ liệu từ request vào entity
+        tagMapper.updateTag(tag, request); // Hoặc: tag.setTagName(request.getTagName());
+
+        return tagMapper.toTagResponse(tagRepository.save(tag));
+    }
+
     public void deleteTag(UUID id) {
         if (!tagRepository.existsById(id)) {
             throw new AppException(ErrorCode.TAG_NOT_FOUND);
         }
         tagRepository.deleteById(id);
     }
+
+    // === QUẢN LÝ TAG SỞ THÍCH CÁ NHÂN (USER ME) ===
 
     @Transactional(readOnly = true)
     public List<UserTagResponse> getUserTags() {
@@ -75,36 +96,53 @@ public class TagService {
 
     public UserTagResponse addUserTag(UUID tagId, boolean temporary) {
         User currentUser = getCurrentUser();
-        Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new AppException(ErrorCode.TAG_NOT_FOUND));
-
         UserTagId userTagId = new UserTagId(currentUser.getId(), tagId);
-        UserTag userTag = userTagRepository.findById(userTagId)
-                .orElse(null);
+
+        UserTag userTag = userTagRepository.findById(userTagId).orElse(null);
 
         if (userTag != null) {
             userTag.setTemporary(temporary);
         } else {
+            Tag tag = tagRepository.findById(tagId)
+                    .orElseThrow(() -> new AppException(ErrorCode.TAG_NOT_FOUND));
+
             userTag = UserTag.builder()
                     .id(userTagId)
                     .user(currentUser)
                     .tag(tag)
                     .temporary(temporary)
                     .build();
+
+            userTag = userTagRepository.save(userTag);
         }
 
-        return tagMapper.toUserTagResponse(userTagRepository.save(userTag));
+        return tagMapper.toUserTagResponse(userTag);
+    }
+
+    // 2. Cập nhật trạng thái Tag cá nhân (User)
+    public UserTagResponse updateUserTag(UUID tagId, boolean temporary) {
+        User currentUser = getCurrentUser();
+        UserTagId userTagId = new UserTagId(currentUser.getId(), tagId);
+
+        // Nếu người dùng chưa gán tag này thì không thể update -> Quăng lỗi
+        UserTag userTag = userTagRepository.findById(userTagId)
+                .orElseThrow(() -> new AppException(ErrorCode.TAG_NOT_FOUND));
+
+        userTag.setTemporary(temporary);
+
+        // Nhờ @Transactional và Dirty Checking của Spring Data JPA,
+        // thay đổi trên userTag sẽ tự động được commit vào DB.
+        return tagMapper.toUserTagResponse(userTag);
     }
 
     public void removeUserTag(UUID tagId) {
         User currentUser = getCurrentUser();
         UserTagId userTagId = new UserTagId(currentUser.getId(), tagId);
 
-        if (!userTagRepository.existsById(userTagId)) {
-            throw new AppException(ErrorCode.TAG_NOT_FOUND);
-        }
+        UserTag userTag = userTagRepository.findById(userTagId)
+                .orElseThrow(() -> new AppException(ErrorCode.TAG_NOT_FOUND));
 
-        userTagRepository.deleteById(userTagId);
+        userTagRepository.delete(userTag);
     }
 
     private User getCurrentUser() {

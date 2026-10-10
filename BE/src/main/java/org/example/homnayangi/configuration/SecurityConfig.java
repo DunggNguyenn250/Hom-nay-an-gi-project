@@ -62,25 +62,23 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
-                // 1. Cấu hình phân quyền Request
-                .authorizeHttpRequests(request ->
-                                // Cho phép truy cập Swagger UI không cần login
-                                request.requestMatchers(SWAGGER_ENDPOINTS).permitAll()
+                .authorizeHttpRequests(request -> request
+                        // 1. Swagger UI
+                        .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
 
-                                        // Cho phép truy cập công khai API public (POST)
-                                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+                        // 2. Public Endpoints
+                        .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
-                                        // Cho phép user xem thông tin của chính mình
-                                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+                        // 3. Cho phép User xem danh sách tất cả tag có sẵn trong hệ thống
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
 
-                                        // Các đường dẫn còn lại cho ADMIN
-                                        .requestMatchers("/api/v1/**").hasRole("ADMIN")
+                        // 4. Cho phép User quản lý tag cá nhân của chính mình (GET, POST, DELETE)
+                        .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                                        .anyRequest().authenticated()
+                        // 5. Tất cả các endpoint quản trị /api/v1/** còn lại (tạo/xóa tag hệ thống, v.v.) dành cho ADMIN
+                        .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
-                        // LƯU Ý: Nếu trong Token của bạn lưu dạng "ROLE_ADMIN" và
-                        // jwtAuthenticationConverter có authorityPrefix là ""
-                        // thì dùng .hasAuthority("ROLE_ADMIN") hoặc .hasRole("ADMIN") đều được.
+                        .anyRequest().authenticated()
                 );
 
         // 2. Cấu hình xác thực JWT Resource Server
