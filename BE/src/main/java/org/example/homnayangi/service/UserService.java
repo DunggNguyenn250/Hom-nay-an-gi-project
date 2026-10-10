@@ -99,9 +99,18 @@ public class UserService {
     }
 
     public void deleteUser(UUID id) {
-        if (!userRepository.existsById(id)) {
-            throw new AppException(ErrorCode.USER_NOT_EXISTED);
+        // 1. Kiểm tra user có tồn tại hay không
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        // 2. Chặn không cho xóa tài khoản có Role ADMIN
+        boolean isAdmin = user.getRoles().contains(Role.ROLE_ADMIN);
+
+        if (isAdmin) {
+            throw new AppException(ErrorCode.CANNOT_DELETE_ADMIN);
         }
-        userRepository.deleteById(id);
+
+        // 3. Thực hiện xóa nếu là user thường
+        userRepository.delete(user);
     }
 }

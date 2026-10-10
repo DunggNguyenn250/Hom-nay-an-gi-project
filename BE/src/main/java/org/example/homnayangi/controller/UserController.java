@@ -75,7 +75,7 @@ public class UserController {
         return ApiResponse.<String>builder()
                 .code(1000)
                 .message("Xóa người dùng thành công")
-                .result("User has been deleted successfully")
+                .result("Người dùng đã bị xóa thành công.")
                 .build();
     }
 }

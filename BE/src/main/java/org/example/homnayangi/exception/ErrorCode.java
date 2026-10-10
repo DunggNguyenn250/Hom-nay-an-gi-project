@@ -15,6 +15,7 @@ public enum ErrorCode {
     USER_NOT_EXISTED(1004, "Người dùng không tồn tại", HttpStatus.NOT_FOUND),
     USER_EXISTED(1005, "Tên đăng nhập hoặc email đã tồn tại", HttpStatus.BAD_REQUEST),
     LOGIN_FAILED(1006, "Tài khoản hoặc mật khẩu không chính xác", HttpStatus.UNAUTHORIZED),
+    CANNOT_DELETE_ADMIN(1007, "Không thể xóa tài khoản Admin hệ thống", HttpStatus.BAD_REQUEST),
 
     // === 3. LỖI VALIDATION DỮ LIỆU ĐẦU VÀO (1100 - 1199) ===
     USERNAME_INVALID(1101, "Tên đăng nhập phải có ít nhất 3 ký tự", HttpStatus.BAD_REQUEST),
