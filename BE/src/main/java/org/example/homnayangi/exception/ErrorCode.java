@@ -22,6 +22,7 @@ public enum ErrorCode {
     USERNAME_INVALID(1101, "Tên đăng nhập phải có ít nhất 3 ký tự", HttpStatus.BAD_REQUEST),
     PASSWORD_INVALID(1102, "Mật khẩu phải có ít nhất 6 ký tự", HttpStatus.BAD_REQUEST),
     EMAIL_INVALID(1103, "Email không đúng định dạng", HttpStatus.BAD_REQUEST),
+    INVALID_ROLE(1104, "Quyền người dùng không hợp lệ", HttpStatus.BAD_REQUEST), // 👈 Thêm dòng này
 
     // === 4. LỖI QUẢN LÝ PHÒNG & GHÉP CẶP (2000 - 2099) ===
     ROOM_NOT_FOUND(2001, "Không tìm thấy phòng ăn", HttpStatus.NOT_FOUND),

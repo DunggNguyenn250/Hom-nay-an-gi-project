@@ -88,12 +88,25 @@ public class UserService {
             user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         }
 
-        if (request.getRoles() != null) {
+        if (request.getRoles() != null && !request.getRoles().isEmpty()) {
             Set<Role> roles = request.getRoles().stream()
-                    .map(Role::valueOf)
+                    .map(roleStr -> {
+                        // 1. Chuẩn hóa chuỗi (VIẾT HOA và tự động thêm prefix ROLE_ nếu thiếu)
+                        String normalized = roleStr.toUpperCase().trim();
+                        if (!normalized.startsWith("ROLE_")) {
+                            normalized = "ROLE_" + normalized;
+                        }
+
+                        // 2. Chuyển đổi an toàn sang Enum
+                        try {
+                            return Role.valueOf(normalized);
+                        } catch (IllegalArgumentException e) {
+                            throw new AppException(ErrorCode.INVALID_ROLE);
+                        }
+                    })
                     .collect(Collectors.toSet());
 
-            // 🌟 CHẶN: Không cho phép gán quyền ROLE_ADMIN cho bất kỳ user nào qua API
+            // 3. Kiểm tra chặn phân quyền ADMIN
             if (roles.contains(Role.ROLE_ADMIN)) {
                 throw new AppException(ErrorCode.CANNOT_ASSIGN_ADMIN_ROLE);
             }
