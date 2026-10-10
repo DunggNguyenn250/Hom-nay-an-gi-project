@@ -92,6 +92,12 @@ public class UserService {
             Set<Role> roles = request.getRoles().stream()
                     .map(Role::valueOf)
                     .collect(Collectors.toSet());
+
+            // 🌟 CHẶN: Không cho phép gán quyền ROLE_ADMIN cho bất kỳ user nào qua API
+            if (roles.contains(Role.ROLE_ADMIN)) {
+                throw new AppException(ErrorCode.CANNOT_ASSIGN_ADMIN_ROLE);
+            }
+
             user.setRoles(roles);
         }
 
