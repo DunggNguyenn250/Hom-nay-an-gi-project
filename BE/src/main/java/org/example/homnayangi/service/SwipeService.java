@@ -15,25 +15,29 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class SwipeService {
 
-    private final SwipeRepository swipeRepository;
-    private final RoomRepository roomRepository;
-    private final UserRepository userRepository;
-    private final PlaceRepository placeRepository;
-    private final RoomMemberRepository roomMemberRepository;
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final PlatformTransactionManager transactionManager;
+    SwipeRepository swipeRepository;
+    RoomRepository roomRepository;
+    UserRepository userRepository;
+    PlaceRepository placeRepository;
+    RoomMemberRepository roomMemberRepository;
+    RedisTemplate<String, Object> redisTemplate;
+    PlatformTransactionManager transactionManager;
 
     public void swipe(SwipeRequest request) {
         String lockKey = "lock:room:" + request.getRoomId();
+        // 🌟 TẠO GIÁ TRỊ NHẬN DẠNG RIÊNG CHO THREAD HIỆN TẠI
+        String lockValue = UUID.randomUUID().toString();
         boolean acquired = false;
         int retries = 5;
+
         while (retries > 0) {
-            Boolean success = redisTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", Duration.ofSeconds(5));
+            Boolean success = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, Duration.ofSeconds(5));
             if (Boolean.TRUE.equals(success)) {
                 acquired = true;
                 break;
@@ -42,6 +46,7 @@ public class SwipeService {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                throw new RuntimeException("Thread interrupted while waiting for lock", e);
             }
             retries--;
         }
@@ -82,7 +87,11 @@ public class SwipeService {
                 }
             });
         } finally {
-            redisTemplate.delete(lockKey);
+            // 🌟 CHỈ XÓA LOCK NẾU GIÁ TRỊ DƯỚI REDIS VẪN LÀ CỦA THREAD NÀY (TRÁNH XÓA NHẦM LOCK)
+            Object currentLockValue = redisTemplate.opsForValue().get(lockKey);
+            if (lockValue.equals(currentLockValue)) {
+                redisTemplate.delete(lockKey);
+            }
         }
     }
 
@@ -98,5 +107,4 @@ public class SwipeService {
             roomRepository.save(room);
         }
     }
-
 }

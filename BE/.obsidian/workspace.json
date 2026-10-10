@@ -190,18 +190,18 @@
   },
   "active": "783d3f2b70dfed87",
   "lastOpenFiles": [
-    "target/classes/org/example/homnayangi/exception/GlobalExceptionHandler.class",
-    "target/classes/org/example/homnayangi/configuration/SecurityConfig.class",
-    "target/classes/org/example/homnayangi/configuration/JwtAccessDeniedHandler.class",
-    "src/main/java/org/example/homnayangi/configuration/JwtAccessDeniedHandler.java",
+    "target/classes/org/example/homnayangi/service/UserService.class",
+    "target/classes/org/example/homnayangi/exception/ErrorCode.class",
+    "target/classes/org/example/homnayangi/configuration/DataInitializer.class",
+    "target/classes/org/example/homnayangi/configuration/DataInitializer$1SamplePlaceData.class",
+    "target/classes/org/example/homnayangi/configuration/DataInitializer$1SampleUserData.class",
+    "target/classes/org/example/homnayangi/repository/PlaceRepository.class",
+    "target/classes/org/example/homnayangi/constant/PredefinedTags.class",
+    "target/classes/org/example/homnayangi/constant",
+    "src/main/java/org/example/homnayangi/constant/PredefinedTags.java",
+    "src/main/java/org/example/homnayangi/constant",
+    "src/main/java/org/example/homnayangi/configuration/DataInitializer.java",
     "README.md",
-    "target/classes/db/migration/V1__init_database.sql",
-    "target/classes/db/migration",
-    "target/classes/db",
-    "target/classes/application.yaml",
-    "testcase.md",
-    "target/test-classes/org/example/homnayangi/HomnayangiApplicationTests.class",
-    "target/test-classes/org/example/homnayangi",
-    "target/test-classes/org/example"
+    "testcase.md"
   ]
 }

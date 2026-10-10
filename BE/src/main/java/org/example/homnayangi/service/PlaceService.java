@@ -34,8 +34,11 @@ public class PlaceService {
         return placeMapper.toPlaceResponse(placeRepository.save(place));
     }
 
-    @CacheEvict(value = {"places_all", "places_category", "places_name", "places_nearby"}, allEntries = true)
-    @CachePut(value = "places", key = "#id")
+    // 🌟 ĐÃ SỬA: Bọc @CachePut và @CacheEvict trong @Caching
+    @Caching(
+            put = @CachePut(value = "places", key = "#id"),
+            evict = @CacheEvict(value = {"places_all", "places_category", "places_name", "places_nearby"}, allEntries = true)
+    )
     public PlaceResponse updatePlace(UUID id, PlaceUpdateRequest request) {
         Place place = placeRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.PLACE_NOT_FOUND));
@@ -85,8 +88,8 @@ public class PlaceService {
     }
 
     @Caching(evict = {
-        @CacheEvict(value = "places", key = "#id"),
-        @CacheEvict(value = {"places_all", "places_category", "places_name", "places_nearby"}, allEntries = true)
+            @CacheEvict(value = "places", key = "#id"),
+            @CacheEvict(value = {"places_all", "places_category", "places_name", "places_nearby"}, allEntries = true)
     })
     public void deletePlace(UUID id) {
         if (!placeRepository.existsById(id)) {
