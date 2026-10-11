@@ -28,8 +28,7 @@ public class SecurityConfig {
             "/api/v1/users",
             "/api/v1/auth/token",
             "/api/v1/auth/introspect",
-            "/api/v1/rooms/**",
-            "/api/v1/swipes/**"
+            "/api/v1/rooms/**"
     };
 
     private final String[] SWAGGER_ENDPOINTS = {
@@ -75,7 +74,10 @@ public class SecurityConfig {
                         // 4. Cho phép User quản lý tag cá nhân của chính mình (GET, POST, DELETE)
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                        // 5. Tất cả các endpoint quản trị /api/v1/** còn lại (tạo/xóa tag hệ thống, v.v.) dành cho ADMIN
+                        // 🌟 1.5. BỔ SUNG: Cho phép User dùng tất cả API Swipe (POST quẹt, GET lịch sử, GET kết quả)
+                        .requestMatchers("/api/v1/swipes/**").authenticated()
+
+                        // 1.6. Tất cả các endpoint /api/v1/** còn lại (tạo/xóa tag hệ thống, v.v.) dành cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
