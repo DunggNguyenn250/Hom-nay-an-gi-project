@@ -24,6 +24,9 @@ public class Room {
     @Column(name = "id", updatable = false, nullable = false)
     UUID id;
 
+    @Column(name = "name", length = 100)
+    String name;
+
     @Column(name = "room_code", unique = true, length = 10)
     String roomCode;
 

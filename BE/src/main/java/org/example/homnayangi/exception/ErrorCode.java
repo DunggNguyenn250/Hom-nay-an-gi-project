@@ -31,8 +31,10 @@ public enum ErrorCode {
     NOT_ROOM_HOST(2004, "Chỉ có chủ phòng mới có quyền thao tác này", HttpStatus.FORBIDDEN),
     ROOM_NOT_OPEN(2005, "Phòng này không còn mở để tham gia", HttpStatus.BAD_REQUEST),
     USER_ALREADY_IN_ROOM(2006, "Bạn đã ở trong phòng này rồi", HttpStatus.BAD_REQUEST),
+    NOT_ROOM_MEMBER(2007, "Bạn không phải là thành viên trong phòng này", HttpStatus.FORBIDDEN), // 🌟 Bổ sung
     ROOM_NOT_SWIPING(2008, "Phòng này chưa bắt đầu hoặc đã kết thúc quẹt", HttpStatus.BAD_REQUEST),
     ROOM_BUSY(2009, "Phòng ăn đang bận xử lý lượt quẹt, vui lòng thử lại sau", HttpStatus.TOO_MANY_REQUESTS),
+    CANNOT_KICK_SELF(2010, "Trưởng phòng không thể tự xóa chính mình ra khỏi phòng", HttpStatus.BAD_REQUEST), // 🌟 Bổ sung
 
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),
@@ -61,7 +63,7 @@ public enum ErrorCode {
     TAG_ALREADY_EXISTS(1304, "Tag đã tồn tại", HttpStatus.BAD_REQUEST),
     TAG_NOT_FOUND(1305, "Tag không tồn tại", HttpStatus.NOT_FOUND),
     CANNOT_BLOCK_SELF(1306, "Không thể chặn chính mình", HttpStatus.BAD_REQUEST),
-    CANNOT_FRIEND_ADMIN(1307, "Không thể gửi lời mời kết bạn cho Quản trị viên", HttpStatus.BAD_REQUEST), 
+    CANNOT_FRIEND_ADMIN(1307, "Không thể gửi lời mời kết bạn cho Quản trị viên", HttpStatus.BAD_REQUEST),
     ;
 
     private final int code;

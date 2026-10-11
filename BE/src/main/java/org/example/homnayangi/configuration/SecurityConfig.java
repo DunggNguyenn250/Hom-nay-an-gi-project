@@ -67,40 +67,43 @@ public class SecurityConfig {
                         // 2. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
-                        // 3. Tags: Cho phép User xem danh sách tag hệ thống
+                        // 3. BỔ SUNG: Cho phép User đã đăng nhập xem thông tin cá nhân của mình
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+
+                        // 4. Tags: Cho phép User xem danh sách tag hệ thống
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
 
-                        // 4. Tags: Cho phép User quản lý tag cá nhân (/me)
+                        // 5. Tags: Cho phép User quản lý tag cá nhân (/me)
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                        // 5. Swipes: Cho phép User thực hiện quẹt, xem lịch sử và xem kết quả
+                        // 6. Swipes: Cho phép User thực hiện quẹt, xem lịch sử và xem kết quả
                         .requestMatchers("/api/v1/swipes/**").authenticated()
 
-                        // 🌟 6. Friendships: Cho phép User gửi/chấp nhận/hủy lời mời kết bạn & xem danh sách bạn bè
+                        // 7. Friendships: Cho phép User gửi/chấp nhận/hủy lời mời kết bạn & xem danh sách bạn bè
                         .requestMatchers("/api/v1/friendships/**").authenticated()
 
-                        // 🌟 7. Rooms: Cho phép User tạo phòng, tham gia phòng, quản lý phòng
+                        // 8. Rooms: Cho phép User tạo phòng, tham gia phòng, quản lý phòng
                         .requestMatchers("/api/v1/rooms/**").authenticated()
 
-                        // 8. Tất cả các endpoint /api/v1/** còn lại (Admin quản lý tag, places, v.v.) dành cho ADMIN
+                        // 9. Tất cả các endpoint /api/v1/** còn lại (Admin quản lý danh sách user, tags, places, v.v.)
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 );
 
-        // 2. Cấu hình xác thực JWT Resource Server
+        // BỔ SUNG CẤU HÌNH JWT RESOURCE SERVER (ĐÃ BỊ THIẾU)
         httpSecurity.oauth2ResourceServer(oauth2 ->
                 oauth2.jwt(jwtConfigurer -> jwtConfigurer
                                 .decoder(jwtDecoder())
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
                         )
-// Bắt lỗi 401 (Chưa đăng nhập / Token sai)
+                        // Bắt lỗi 401 (Chưa đăng nhập / Token không hợp lệ)
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
-                        // Bắt lỗi 403 (Đã đăng nhập nhưng không đủ quyền Admin)
+                        // Bắt lỗi 403 (Đã đăng nhập nhưng không đủ quyền)
                         .accessDeniedHandler(new JwtAccessDeniedHandler())
         );
 
-        // 3. Tắt CSRF
+        // Tắt CSRF
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
         return httpSecurity.build();

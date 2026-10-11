@@ -639,6 +639,14 @@ Lấy danh sách lời mời kết bạn mình **ĐÃ GỬI ĐI** (đang chờ �
 
 ---
 
+Dưới đây là tài liệu Markdown đầy đủ cho module **Rooms**, đã bao gồm cả 3 API mới bổ sung (`GET detail`, `DELETE leave`, `DELETE kick member`) để bạn sao chép lại phục vụ quá trình test Postman/Swagger:
+
+---
+
+Dưới đây là tài liệu Markdown ghi chú API cho module **Rooms** đã được bổ sung thêm endpoint **`GET /api/v1/rooms/my-rooms`** (và sắp xếp lại theo thứ tự logic) để bạn lưu lại làm tài liệu kiểm thử:
+
+---
+
 ## 🏠 Rooms
 
 ### `POST /api/v1/rooms` 🔒
@@ -657,7 +665,7 @@ Tạo phòng mới để chọn địa điểm ăn nhóm.
 
 ```json
 {
-  "id": "uuid",
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "roomCode": "ABC123",
   "host": {
     "id": "uuid",
@@ -665,16 +673,16 @@ Tạo phòng mới để chọn địa điểm ăn nhóm.
     "email": "alice@example.com",
     "avatarUrl": null,
     "status": "ACTIVE",
-    "createdAt": "2024-01-01T00:00:00",
-    "roles": ["USER"]
+    "createdAt": "2026-01-01T00:00:00",
+    "roles": ["ROLE_USER"]
   },
-  "status": "WAITING",
+  "status": "OPEN",
   "matchedPlace": null,
-  "createdAt": "2024-01-01T00:00:00"
+  "createdAt": "2026-10-11T16:00:00"
 }
 ```
 
-> **RoomStatus:** `WAITING` | `SWIPING` | `CLOSED`
+> **RoomStatus:** `OPEN` | `SWIPING` | `CLOSED`
 
 ---
 
@@ -683,9 +691,57 @@ Tạo phòng mới để chọn địa điểm ăn nhóm.
 Tham gia phòng bằng mã phòng.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên        | Kiểu   | Mô tả                   |
+| ---------- | ------ | ----------------------- |
 | `roomCode` | string | Mã phòng (vd: `ABC123`) |
+
+**Request:** Không có body.
+
+**Response (`result`):** `RoomResponse` như trên.
+
+---
+
+### `GET /api/v1/rooms/my-rooms` 🔒
+
+Lấy danh sách các phòng ăn mà người dùng hiện tại đang tham gia và còn đang hoạt động (`OPEN` hoặc `SWIPING`).
+
+**Request:** Không có body.
+
+**Response (`result`):** Mảng `RoomResponse[]`
+
+```json
+[
+  {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "roomCode": "ABC123",
+    "host": {
+      "id": "uuid",
+      "username": "alice",
+      "email": "alice@example.com",
+      "avatarUrl": null,
+      "status": "ACTIVE",
+      "createdAt": "2026-01-01T00:00:00",
+      "roles": ["ROLE_USER"]
+    },
+    "status": "OPEN",
+    "matchedPlace": null,
+    "createdAt": "2026-10-11T16:00:00"
+  }
+]
+```
+
+---
+
+### `GET /api/v1/rooms/{roomId}` 🔒
+
+Lấy thông tin chi tiết phòng và danh sách các thành viên hiện tại trong phòng.
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả    |
+| -------- | ---- | -------- |
+| `roomId` | UUID | ID phòng |
 
 **Request:** Không có body.
 
@@ -698,21 +754,87 @@ Tham gia phòng bằng mã phòng.
 Bắt đầu phiên swipe (chỉ host mới có quyền).
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên      | Kiểu | Mô tả    |
+| -------- | ---- | -------- |
 | `roomId` | UUID | ID phòng |
 
 **Request:** Không có body.
 
-**Response (`result`):** `null` — chỉ trả về wrapper với code/message thành công.
+**Response (`result`):**
+
+```json
+{
+  "code": 1000,
+  "message": "Bắt đầu phiên quẹt chọn địa điểm thành công",
+  "result": null
+}
+```
 
 ---
 
-Dưới đây là tài liệu API hoàn chỉnh của module **Swipes** đã được bổ sung **2 API `GET**` mới phục vụ cho việc lấy lịch sử quẹt cá nhân và bảng kết quả của cả phòng.
+### `DELETE /api/v1/rooms/{roomId}/leave` 🔒
 
-Bạn có thể sao chép trực tiếp tài liệu này để lưu lại test:
+Thành viên tự rời khỏi phòng ăn.
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả    |
+| -------- | ---- | -------- |
+| `roomId` | UUID | ID phòng |
+
+**Request:** Không có body.
+
+**Response (`result`):**
+
+```json
+"Đã rời khỏi phòng thành công"
+```
 
 ---
+
+### `DELETE /api/v1/rooms/{roomId}/members/{memberUserId}` 🔒
+
+Chủ phòng (Host) xóa (kick) một thành viên bất kỳ ra khỏi phòng.
+
+**Path Variable:**
+
+| Tên            | Kiểu | Mô tả                                |
+| -------------- | ---- | ------------------------------------ |
+| `roomId`       | UUID | ID phòng                             |
+| `memberUserId` | UUID | ID của thành viên cần xóa khỏi phòng |
+
+**Request:** Không có body.
+
+**Response (`result`):**
+
+```json
+"Xóa thành viên thành công"
+```
+
+### 3. Ghi chú Test Postman cho API này:
+
+#### `DELETE /api/v1/rooms/{roomId}` 🔒
+
+Chủ phòng (Host) xóa hoàn toàn phòng ăn và toàn bộ liên kết thành viên trong phòng khỏi Database.
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả                |
+| -------- | ---- | -------------------- |
+| `roomId` | UUID | ID của phòng cần xóa |
+
+**Request:** Không có body.
+
+**Response (`result`):**
+
+```json
+{
+  "code": 1000,
+  "message": "Xóa phòng ăn thành công",
+  "result": "Đã xóa phòng ăn thành công"
+}
+```
 
 ## 👆 Swipes
 

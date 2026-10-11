@@ -1,6 +1,8 @@
 package org.example.homnayangi.controller;
 
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.SwipeRequest;
 import org.example.homnayangi.dto.response.ApiResponse;
 import org.example.homnayangi.dto.response.RoomPlaceResultResponse;
@@ -14,9 +16,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/swipes")
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SwipeController {
 
-    private final SwipeService swipeService;
+    SwipeService swipeService;
 
     @PostMapping
     public ApiResponse<Void> swipe(@RequestBody SwipeRequest request) {

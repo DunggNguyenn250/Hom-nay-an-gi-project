@@ -1,7 +1,9 @@
 package org.example.homnayangi.controller;
 
 import jakarta.validation.Valid;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.ExpenseCreateRequest;
 import org.example.homnayangi.dto.response.ApiResponse;
 import org.example.homnayangi.dto.response.ExpenseResponse;
@@ -16,9 +18,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/expenses")
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ExpenseController {
 
-    private final ExpenseService expenseService;
+    ExpenseService expenseService;
 
     // =========================================================================
     // POST /api/v1/expenses

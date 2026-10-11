@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Hom nay an gi.md",
+                "file": "file:D:/File/CODE/Spring-boot/Báo cáo README_11_10/README_11_11.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Hom nay an gi"
+              "title": "README_11_11"
             }
           }
         ]
@@ -188,19 +188,19 @@
       "bases:Tạo cơ sở mới": false
     }
   },
-  "active": "783d3f2b70dfed87",
+  "active": "c373ccdc4ace9bab",
   "lastOpenFiles": [
-    "target/classes/org/example/homnayangi/service/UserService.class",
-    "target/classes/org/example/homnayangi/exception/ErrorCode.class",
-    "target/classes/org/example/homnayangi/configuration/DataInitializer.class",
-    "target/classes/org/example/homnayangi/configuration/DataInitializer$1SamplePlaceData.class",
-    "target/classes/org/example/homnayangi/configuration/DataInitializer$1SampleUserData.class",
-    "target/classes/org/example/homnayangi/repository/PlaceRepository.class",
-    "target/classes/org/example/homnayangi/constant/PredefinedTags.class",
-    "target/classes/org/example/homnayangi/constant",
-    "src/main/java/org/example/homnayangi/constant/PredefinedTags.java",
-    "src/main/java/org/example/homnayangi/constant",
-    "src/main/java/org/example/homnayangi/configuration/DataInitializer.java",
+    "target/classes/org/example/homnayangi/controller/RoomController.class",
+    "target/classes/org/example/homnayangi/service/RoomService.class",
+    "target/classes/org/example/homnayangi/configuration/SecurityConfig.class",
+    "target/test-classes/org/example/homnayangi/HomnayangiApplicationTests.class",
+    "target/test-classes/org/example/homnayangi",
+    "target/test-classes/org/example",
+    "target/test-classes/org",
+    "target/test-classes",
+    "target/generated-test-sources/test-annotations",
+    "target/generated-test-sources",
+    "target/classes/org/example/homnayangi/entity/Room.class",
     "README.md",
     "testcase.md"
   ]
