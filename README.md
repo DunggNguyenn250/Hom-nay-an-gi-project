@@ -1,6 +1,3 @@
-Thành viên: Nguyễn Bá Dũng
-Vai trò: Đảm nhiệm phát triển phía máy chủ (Backend)
-
 # 🍜 Hôm Nay Ăn Gì? — Back-end API
 
 > **"Hôm Nay Ăn Gì?"** là ứng dụng giúp các nhóm bạn đồng thuận chọn quán ăn theo cơ chế vuốt thẻ kiểu Tinder, sau đó tự động chia hóa đơn minh bạch. Tài liệu này mô tả toàn bộ kiến trúc và thiết kế phần **Back-end (REST API)**.
