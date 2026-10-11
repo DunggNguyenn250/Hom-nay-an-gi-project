@@ -61,6 +61,7 @@ public enum ErrorCode {
     TAG_ALREADY_EXISTS(1304, "Tag đã tồn tại", HttpStatus.BAD_REQUEST),
     TAG_NOT_FOUND(1305, "Tag không tồn tại", HttpStatus.NOT_FOUND),
     CANNOT_BLOCK_SELF(1306, "Không thể chặn chính mình", HttpStatus.BAD_REQUEST),
+    CANNOT_FRIEND_ADMIN(1307, "Không thể gửi lời mời kết bạn cho Quản trị viên", HttpStatus.BAD_REQUEST), 
     ;
 
     private final int code;

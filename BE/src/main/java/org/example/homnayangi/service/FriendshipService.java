@@ -9,6 +9,7 @@ import org.example.homnayangi.entity.Friendship;
 import org.example.homnayangi.entity.FriendshipId;
 import org.example.homnayangi.entity.User;
 import org.example.homnayangi.enums.FriendshipStatus;
+import org.example.homnayangi.enums.Role;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
 import org.example.homnayangi.mapper.FriendshipMapper;
@@ -32,10 +33,10 @@ public class FriendshipService {
     UserRepository userRepository;
     FriendshipMapper friendshipMapper;
     UserMapper userMapper;
-
     public FriendshipResponse sendFriendRequest(UUID addresseeId) {
         User requester = getCurrentUser();
 
+        // 1. Không cho tự kết bạn với chính mình
         if (requester.getId().equals(addresseeId)) {
             throw new AppException(ErrorCode.CANNOT_FRIEND_SELF);
         }
@@ -43,6 +44,14 @@ public class FriendshipService {
         User addressee = userRepository.findById(addresseeId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        // 🌟 2. Kiểm tra nếu đối phương có Role ADMIN (Dùng trực tiếp Enum Role.ROLE_ADMIN)
+        boolean isAddresseeAdmin = addressee.getRoles() != null && addressee.getRoles().contains(Role.ROLE_ADMIN);
+
+        if (isAddresseeAdmin) {
+            throw new AppException(ErrorCode.CANNOT_FRIEND_ADMIN);
+        }
+
+        // 3. Kiểm tra mối quan hệ đã tồn tại chưa
         var existingFriendshipOpt = friendshipRepository.findFriendshipBetween(requester.getId(), addresseeId);
 
         if (existingFriendshipOpt.isPresent()) {
@@ -50,7 +59,7 @@ public class FriendshipService {
             if (friendship.getStatus() == FriendshipStatus.ACCEPTED) {
                 throw new AppException(ErrorCode.FRIENDSHIP_ALREADY_EXISTS);
             } else if (friendship.getStatus() == FriendshipStatus.PENDING) {
-                // If the other user already sent a pending request, we auto-accept it!
+                // Nếu đối phương đã gửi lời mời trước đó -> Tự động chấp nhận luôn!
                 if (friendship.getRequester().getId().equals(addresseeId)) {
                     friendship.setStatus(FriendshipStatus.ACCEPTED);
                     return friendshipMapper.toFriendshipResponse(friendshipRepository.save(friendship));

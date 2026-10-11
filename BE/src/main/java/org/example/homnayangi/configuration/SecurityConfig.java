@@ -27,8 +27,7 @@ public class SecurityConfig {
     private final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/users",
             "/api/v1/auth/token",
-            "/api/v1/auth/introspect",
-            "/api/v1/rooms/**"
+            "/api/v1/auth/introspect"
     };
 
     private final String[] SWAGGER_ENDPOINTS = {
@@ -62,22 +61,28 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
                 .authorizeHttpRequests(request -> request
-                        // 1. Swagger UI
+                        // 1. Swagger UI (Public)
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
 
-                        // 2. Public Endpoints
+                        // 2. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
-                        // 3. Cho phép User xem danh sách tất cả tag có sẵn trong hệ thống
+                        // 3. Tags: Cho phép User xem danh sách tag hệ thống
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
 
-                        // 4. Cho phép User quản lý tag cá nhân của chính mình (GET, POST, DELETE)
+                        // 4. Tags: Cho phép User quản lý tag cá nhân (/me)
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                        // 🌟 1.5. BỔ SUNG: Cho phép User dùng tất cả API Swipe (POST quẹt, GET lịch sử, GET kết quả)
+                        // 5. Swipes: Cho phép User thực hiện quẹt, xem lịch sử và xem kết quả
                         .requestMatchers("/api/v1/swipes/**").authenticated()
 
-                        // 1.6. Tất cả các endpoint /api/v1/** còn lại (tạo/xóa tag hệ thống, v.v.) dành cho ADMIN
+                        // 🌟 6. Friendships: Cho phép User gửi/chấp nhận/hủy lời mời kết bạn & xem danh sách bạn bè
+                        .requestMatchers("/api/v1/friendships/**").authenticated()
+
+                        // 🌟 7. Rooms: Cho phép User tạo phòng, tham gia phòng, quản lý phòng
+                        .requestMatchers("/api/v1/rooms/**").authenticated()
+
+                        // 8. Tất cả các endpoint /api/v1/** còn lại (Admin quản lý tag, places, v.v.) dành cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()

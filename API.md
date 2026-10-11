@@ -530,15 +530,22 @@ Xóa tag sở thích của người dùng hiện tại.
 "User tag has been removed successfully"
 ```
 
+Tài liệu note của bạn đang bị lệch một vài URL so với file `FriendshipController.java` đã được tối ưu lại theo chuẩn RESTful trước đó (đặc biệt là các chỗ `requests` có "s" và luồng `/requests/incoming`, `/requests/outgoing`).
+
+Dưới đây là bản Markdown tài liệu API **Friendships** chuẩn chỉnh 100% khớp với code Backend hiện tại để bạn lưu lại test trên Postman/Swagger:
+
+---
+
 ## 🤝 Friendships
 
-### `POST /api/v1/friendships/request/{addresseeId}` 🔒
+### `POST /api/v1/friendships/requests/{addresseeId}` 🔒
 
 Gửi lời mời kết bạn.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên           | Kiểu | Mô tả                 |
+| ------------- | ---- | --------------------- |
 | `addresseeId` | UUID | ID người nhận lời mời |
 
 **Request:** Không có body.
@@ -554,7 +561,7 @@ Gửi lời mời kết bạn.
     "avatarUrl": "https://...",
     "status": "ACTIVE",
     "createdAt": "2024-01-01T00:00:00",
-    "roles": ["USER"]
+    "roles": ["ROLE_USER"]
   },
   "addressee": {
     "id": "uuid",
@@ -563,24 +570,25 @@ Gửi lời mời kết bạn.
     "avatarUrl": null,
     "status": "ACTIVE",
     "createdAt": "2024-01-01T00:00:00",
-    "roles": ["USER"]
+    "roles": ["ROLE_USER"]
   },
   "status": "PENDING",
   "createdAt": "2024-01-01T00:00:00"
 }
 ```
 
-> **FriendshipStatus:** `PENDING` | `ACCEPTED` | `DECLINED` | `BLOCKED`
+> **FriendshipStatus:** `PENDING` | `ACCEPTED`
 
 ---
 
-### `PUT /api/v1/friendships/accept/{requesterId}` 🔒
+### `PUT /api/v1/friendships/requests/{requesterId}/accept` 🔒
 
-Chấp nhận lời mời kết bạn.
+Chấp nhận lời mời kết bạn từ một người khác.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên           | Kiểu | Mô tả                   |
+| ------------- | ---- | ----------------------- |
 | `requesterId` | UUID | ID người đã gửi lời mời |
 
 **Request:** Không có body.
@@ -591,12 +599,13 @@ Chấp nhận lời mời kết bạn.
 
 ### `DELETE /api/v1/friendships/{targetUserId}` 🔒
 
-Từ chối lời mời kết bạn hoặc hủy kết bạn.
+Hủy kết bạn, từ chối lời mời nhận được hoặc thu hồi lời mời đã gửi đi.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
-| `targetUserId` | UUID | ID người dùng đối phương |
+
+| Tên            | Kiểu | Mô tả                        |
+| -------------- | ---- | ---------------------------- |
+| `targetUserId` | UUID | ID của người dùng đối phương |
 
 **Response (`result`):**
 
@@ -608,23 +617,23 @@ Từ chối lời mời kết bạn hoặc hủy kết bạn.
 
 ### `GET /api/v1/friendships` 🔒
 
-Lấy danh sách bạn bè của người dùng hiện tại.
+Lấy danh sách bạn bè chính thức của người dùng hiện tại.
 
 **Response (`result`):** Mảng `UserResponse[]`.
 
 ---
 
-### `GET /api/v1/friendships/pending/incoming` 🔒
+### `GET /api/v1/friendships/requests/incoming` 🔒
 
-Lấy danh sách lời mời kết bạn đến (người khác gửi cho mình).
+Lấy danh sách lời mời kết bạn gửi **ĐẾN** mình (đang chờ mình chấp nhận).
 
 **Response (`result`):** Mảng `FriendshipResponse[]` với `status: "PENDING"`.
 
 ---
 
-### `GET /api/v1/friendships/pending/outgoing` 🔒
+### `GET /api/v1/friendships/requests/outgoing` 🔒
 
-Lấy danh sách lời mời kết bạn đi (mình đã gửi cho người khác).
+Lấy danh sách lời mời kết bạn mình **ĐÃ GỬI ĐI** (đang chờ đối phương chấp nhận).
 
 **Response (`result`):** Mảng `FriendshipResponse[]` với `status: "PENDING"`.
 
