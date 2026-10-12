@@ -74,7 +74,8 @@ public class SecurityConfig {
         // - http://localhost:5173: Cổng mặc định của Vite React
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "http://localhost:5174"
         ));
 
         // Cho phép tất cả các HTTP Method cần thiết
