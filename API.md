@@ -916,25 +916,74 @@ Lấy tổng hợp kết quả bình chọn/quẹt địa điểm của tất c�
 ]
 ```
 
-## 💰 Expenses
+Dưới đây là ghi chú tài liệu API **Đóng phòng ăn (Close Room)** để bạn lưu lại và nhập vào Postman test:
+
+---
+
+### `POST /api/v1/rooms/{roomId}/close` 🔒
+
+Chủ phòng (Host) chủ động đóng phòng ăn để kết thúc phiên quẹt địa điểm và chuẩn bị cho bước tạo hóa đơn chia tiền (`Expenses`).
+
+> **Ràng buộc:**
+>
+> - Chỉ **Host (Chủ phòng)** mới có quyền đóng phòng.
+> - Phòng phải đang ở trạng thái `OPEN` hoặc `SWIPING`. Nếu phòng đã `CLOSED` trước đó, hệ thống sẽ trả về lỗi.
+
+**Path Variable:**
+
+| Tên      | Kiểu | Mô tả                    |
+| -------- | ---- | ------------------------ |
+| `roomId` | UUID | ID của phòng ăn cần đóng |
+
+**Request Body:** Không có.
+
+**Response thành công (`200 OK`):**
+
+```json
+{
+  "code": 1000,
+  "message": "Đã đóng phòng ăn thành công",
+  "result": null
+}
+```
+
+---
+
+### ❌ Các trường hợp lỗi thường gặp
+
+| HTTP Status        | Error Code | Mô tả                                                  |
+| ------------------ | ---------- | ------------------------------------------------------ |
+| `401 Unauthorized` | `1002`     | Chưa đăng nhập hoặc Token hết hạn.                     |
+| `403 Forbidden`    | `1014`     | Người dùng hiện tại không phải là Host của phòng.      |
+| `404 Not Found`    | `1013`     | Không tìm thấy phòng với `roomId` tương ứng.           |
+| `400 Bad Request`  | `1015`     | **Phòng ăn đã đóng trước đó** (`ROOM_ALREADY_CLOSED`). |
+
+Dưới đây là tài liệu API hoàn chỉnh cho module **💰 Expenses** đã được bổ sung thêm endpoint **`DELETE`** và cập nhật trường **`status`** (`UNPAID`, `PARTIALLY_PAID`, `FULLY_PAID`). Bạn có thể sao chép toàn bộ nội dung này để lưu tài liệu hoặc dùng test trên Postman.
+
+---
+
+## 💰 Expenses API Specification
 
 ### `POST /api/v1/expenses` 🔒
 
-Tạo hóa đơn mới cho phòng đã kết thúc (status = `CLOSED`).
+Tạo hóa đơn mới cho phòng đã kết thúc (status = `CLOSED`). Hóa đơn vừa tạo mặc định có trạng thái `status = "UNPAID"`.
 
 **Request Body:**
 
 ```json
 {
-  "roomId": "uuid",
-  "payerId": "uuid",
-  "totalAmount": 500000,
+  "roomId": "af2d7a79-ffba-4f7a-b08c-1748f97f63ef",
+  "payerId": "bc6fd570-fe91-41e2-bdd0-2e38bb499323",
+  "totalAmount": 110000,
   "splitType": "EVENLY",
   "items": [
     {
       "itemName": "Bún bò",
       "price": 60000,
-      "sharerIds": ["uuid-user1", "uuid-user2"]
+      "sharerIds": [
+        "bc6fd570-fe91-41e2-bdd0-2e38bb499323",
+        "9fc1eaba-711f-43a5-b16f-16172e0bee78"
+      ]
     },
     {
       "itemName": "Cơm tấm",
@@ -947,55 +996,59 @@ Tạo hóa đơn mới cho phòng đã kết thúc (status = `CLOSED`).
 
 > **Ràng buộc:**
 >
-> - `roomId`, `payerId`, `totalAmount` bắt buộc
-> - `totalAmount` phải > 0
-> - `items` không được rỗng; mỗi item cần `itemName` và `price` > 0
-> - `sharerIds` tùy chọn — nếu `null`/rỗng thì tất cả thành viên phòng chia sẻ món đó
+> - `roomId`, `payerId`, `totalAmount` bắt buộc.
+> - `totalAmount` phải > 0 và bằng tổng giá trị trị các món trong `items`.
+> - `items` không được rỗng; mỗi item cần `itemName` và `price` > 0.
+> - `sharerIds` tùy chọn — nếu `null`/rỗng thì mặc định tất cả thành viên trong phòng chia sẻ món đó.
 >
 > **SplitType:**
 >
-> - `EVENLY` (mặc định): Chia đều tổng tiền cho tất cả thành viên
-> - `BY_ITEM`: Mỗi người trả theo những món họ order (`sharerIds`)
+> - `EVENLY` (mặc định): Chia đều tổng tiền cho tất cả thành viên.
+> - `BY_ITEM`: Mỗi người trả theo những món họ order (`sharerIds`).
 
 **Response (`result`):**
 
 ```json
 {
-  "id": "uuid",
-  "room": {
-    "id": "uuid",
-    "roomCode": "ABC123",
-    "host": { ... },
-    "status": "CLOSED",
-    "matchedPlace": { ... },
-    "createdAt": "2024-01-01T00:00:00"
-  },
-  "payer": {
-    "id": "uuid",
-    "username": "alice",
-    ...
-  },
-  "totalAmount": 500000,
-  "splitType": "EVENLY",
-  "createdAt": "2024-01-01T00:00:00",
-  "items": [
-    {
-      "id": "uuid",
-      "itemName": "Bún bò",
-      "price": 60000,
-      "sharerCount": 2,
-      "pricePerPerson": 30000
-    }
-  ],
-  "splits": [
-    {
-      "expenseId": "uuid",
-      "user": { "id": "uuid", "username": "bob", ... },
-      "amountOwed": 250000,
-      "paid": false
-    }
-  ],
-  "fullyPaid": false
+  "code": 1000,
+  "message": "Tạo hóa đơn thành công",
+  "result": {
+    "id": "7a33f8b5-1da1-482d-a638-b91f7dbc8999",
+    "room": {
+      "id": "eec45b65-4350-4bfc-b64c-f528ef7f5e67",
+      "roomCode": "ABC123",
+      "status": "CLOSED"
+    },
+    "payer": {
+      "id": "bc6fd570-fe91-41e2-bdd0-2e38bb499323",
+      "username": "alice"
+    },
+    "totalAmount": 500000,
+    "splitType": "EVENLY",
+    "status": "UNPAID",
+    "createdAt": "2026-10-11T22:00:00",
+    "items": [
+      {
+        "id": "11111111-1da1-482d-a638-b91f7dbc8999",
+        "itemName": "Bún bò",
+        "price": 60000,
+        "sharerCount": 2,
+        "pricePerPerson": 30000
+      }
+    ],
+    "splits": [
+      {
+        "expenseId": "7a33f8b5-1da1-482d-a638-b91f7dbc8999",
+        "user": {
+          "id": "9fc1eaba-711f-43a5-b16f-16172e0bee78",
+          "username": "bob"
+        },
+        "amountOwed": 250000,
+        "paid": false
+      }
+    ],
+    "fullyPaid": false
+  }
 }
 ```
 
@@ -1006,11 +1059,12 @@ Tạo hóa đơn mới cho phòng đã kết thúc (status = `CLOSED`).
 Lấy chi tiết một hóa đơn.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên         | Kiểu | Mô tả      |
+| ----------- | ---- | ---------- |
 | `expenseId` | UUID | ID hóa đơn |
 
-**Response (`result`):** `ExpenseResponse` như trên.
+**Response (`result`):** `ExpenseResponse` như trên (bao gồm trường `status`).
 
 ---
 
@@ -1019,8 +1073,9 @@ Lấy chi tiết một hóa đơn.
 Lấy tất cả hóa đơn của một phòng.
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên      | Kiểu | Mô tả    |
+| -------- | ---- | -------- |
 | `roomId` | UUID | ID phòng |
 
 **Response (`result`):** Mảng `ExpenseResponse[]`.
@@ -1029,38 +1084,44 @@ Lấy tất cả hóa đơn của một phòng.
 
 ### `GET /api/v1/expenses/my-debts` 🔒
 
-Lấy danh sách khoản nợ chưa thanh toán của người dùng hiện tại (từ JWT token).
+Lấy danh sách khoản nợ chưa thanh toán của người dùng hiện tại (lấy từ JWT token).
 
-**Request:** Không có params.
+**Request:** Không có params / body.
 
 **Response (`result`):**
 
 ```json
-[
-  {
-    "expenseId": "uuid",
-    "user": {
-      "id": "uuid",
-      "username": "bob",
-      ...
-    },
-    "amountOwed": 250000,
-    "paid": false
-  }
-]
+{
+  "code": 1000,
+  "message": "Danh sách khoản nợ chưa thanh toán",
+  "result": [
+    {
+      "expenseId": "7a33f8b5-1da1-482d-a638-b91f7dbc8999",
+      "user": {
+        "id": "9fc1eaba-711f-43a5-b16f-16172e0bee78",
+        "username": "bob"
+      },
+      "amountOwed": 250000,
+      "paid": false
+    }
+  ]
+}
 ```
 
 ---
 
 ### `PATCH /api/v1/expenses/{expenseId}/splits/{userId}/pay` 🔒
 
-Xác nhận một người đã thanh toán khoản của họ (chỉ payer xác nhận).
+Xác nhận một người đã thanh toán khoản nợ của họ (Chỉ Payer hoặc chính người nợ mới được gọi).
+
+> **Lưu ý:** Tự động chuyển `status` của hóa đơn sang `PARTIALLY_PAID` (nếu trả 1 phần) hoặc `FULLY_PAID` (nếu tất cả đã trả xong).
 
 **Path Variables:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
-| `expenseId` | UUID | ID hóa đơn |
-| `userId` | UUID | ID người đã thanh toán |
+
+| Tên         | Kiểu | Mô tả                  |
+| ----------- | ---- | ---------------------- |
+| `expenseId` | UUID | ID hóa đơn             |
+| `userId`    | UUID | ID người đã thanh toán |
 
 **Request:** Không có body.
 
@@ -1068,10 +1129,14 @@ Xác nhận một người đã thanh toán khoản của họ (chỉ payer xác
 
 ```json
 {
-  "expenseId": "uuid",
-  "user": { "id": "uuid", "username": "bob", ... },
-  "amountOwed": 250000,
-  "paid": true
+  "code": 1000,
+  "message": "Đã xác nhận thanh toán thành công",
+  "result": {
+    "expenseId": "7a33f8b5-1da1-482d-a638-b91f7dbc8999",
+    "user": { "id": "9fc1eaba-711f-43a5-b16f-16172e0bee78", "username": "bob" },
+    "amountOwed": 250000,
+    "paid": true
+  }
 }
 ```
 
@@ -1079,22 +1144,52 @@ Xác nhận một người đã thanh toán khoản của họ (chỉ payer xác
 
 ### `PATCH /api/v1/expenses/{expenseId}/pay-all` 🔒
 
-Đánh dấu toàn bộ hóa đơn là đã thanh toán (chỉ payer).
+Đánh dấu toàn bộ hóa đơn là đã thanh toán (chỉ Payer mới có quyền).
 
 **Path Variable:**
-| Tên | Kiểu | Mô tả |
-|-----|------|-------|
+
+| Tên         | Kiểu | Mô tả      |
+| ----------- | ---- | ---------- |
 | `expenseId` | UUID | ID hóa đơn |
 
 **Request:** Không có body.
 
-**Response (`result`):** `ExpenseResponse` với `fullyPaid: true` và tất cả `splits[].paid: true`.
+**Response (`result`):** `ExpenseResponse` với `"status": "FULLY_PAID"`, `"fullyPaid": true` và tất cả `"splits[].paid": true`.
+
+---
+
+### `DELETE /api/v1/expenses/{expenseId}` 🔒 _(MỚI)_
+
+Xóa hoàn toàn một hóa đơn ra khỏi hệ thống.
+
+> **Ràng buộc:**
+>
+> - Chỉ **Payer (người trả tiền)** hoặc **Host của phòng** mới có quyền xóa.
+> - Hóa đơn phải đang ở trạng thái **`UNPAID`** (chưa có ai thanh toán). Nếu đã có người trả tiền (`status` là `PARTIALLY_PAID` hoặc `FULLY_PAID`) hệ thống sẽ chặn không cho xóa.
+
+**Path Variable:**
+
+| Tên         | Kiểu | Mô tả                  |
+| ----------- | ---- | ---------------------- |
+| `expenseId` | UUID | ID của hóa đơn cần xóa |
+
+**Request:** Không có body.
+
+**Response (`result`):**
+
+```json
+{
+  "code": 1000,
+  "message": "Xóa hóa đơn thành công",
+  "result": "Đã xóa hóa đơn thành công"
+}
+```
 
 ---
 
 ## ❌ Error Response
 
-Khi có lỗi, response trả về:
+Khi xảy ra lỗi, API sẽ trả về cấu trúc:
 
 ```json
 {
@@ -1103,10 +1198,11 @@ Khi có lỗi, response trả về:
 }
 ```
 
-| HTTP Status | Ý nghĩa                                         |
-| ----------- | ----------------------------------------------- |
-| `400`       | Dữ liệu đầu vào không hợp lệ                    |
-| `401`       | Chưa xác thực / Token không hợp lệ hoặc hết hạn |
-| `403`       | Không có quyền truy cập                         |
-| `404`       | Không tìm thấy tài nguyên                       |
-| `500`       | Lỗi server nội bộ                               |
+| Mã Code | HTTP Status        | Mô tả lỗi                                              |
+| ------- | ------------------ | ------------------------------------------------------ |
+| `1001`  | `400 BAD_REQUEST`  | Dữ liệu đầu vào không hợp lệ (Validation Error)        |
+| `1002`  | `401 UNAUTHORIZED` | Chưa đăng nhập hoặc Token hết hạn                      |
+| `1003`  | `403 FORBIDDEN`    | Không có quyền thực hiện thao tác này                  |
+| `4001`  | `400 BAD_REQUEST`  | Tổng tiền nhập vào không khớp với tổng tiền các món    |
+| `4002`  | `400 BAD_REQUEST`  | **Hóa đơn đã có thành viên thanh toán, không thể xóa** |
+| `4004`  | `404 NOT_FOUND`    | Không tìm thấy hóa đơn hoặc phòng tương ứng            |

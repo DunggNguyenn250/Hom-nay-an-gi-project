@@ -95,7 +95,7 @@ public class RoomService {
         return getRoomDetails(room.getId()); // Trả về RoomResponse đầy đủ thông tin thành viên
     }
 
-    // 3. Lấy danh sách phòng của tôi (Không cần danh sách thành viên chi tiết)
+    // 3. Lấy danh sách phòng của tôi (Không lọc trạng thái, lấy tất cả phòng đã tham gia)
     @Transactional(readOnly = true)
     public List<RoomResponse> getMyRooms() {
         User currentUser = getCurrentUser();
@@ -104,11 +104,10 @@ public class RoomService {
 
         List<Room> rooms = myMemberships.stream()
                 .map(RoomMember::getRoom)
-                .filter(room -> room.getStatus() != RoomStatus.CLOSED)
+                // Đã bỏ dòng filter CLOSED để lấy luôn phòng đã đóng
                 .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
                 .toList();
 
-        // Map trực tiếp từ Room sang RoomResponse (members sẽ là null/rỗng)
         return rooms.stream()
                 .map(roomMapper::toRoomResponse)
                 .toList();
@@ -233,5 +232,29 @@ public class RoomService {
 
         // 4. Xóa phòng khỏi Database
         roomRepository.delete(room);
+    }
+
+    @Transactional
+    public void closeRoom(UUID roomId) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 1. Chỉ Host mới có quyền đóng phòng
+        if (!room.getHost().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. Kiểm tra nếu phòng đã đóng rồi thì báo lỗi
+        if (room.getStatus() == RoomStatus.CLOSED) {
+            throw new AppException(ErrorCode.ROOM_ALREADY_CLOSED);
+        }
+
+        // 3. Chuyển trạng thái phòng thành CLOSED
+        room.setStatus(RoomStatus.CLOSED);
+        roomRepository.save(room);
     }
 }

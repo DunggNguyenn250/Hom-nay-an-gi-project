@@ -3,6 +3,7 @@ package org.example.homnayangi.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.homnayangi.enums.ExpenseStatus;
 import org.example.homnayangi.enums.SplitType;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -42,6 +43,11 @@ public class Expense {
     @Column(name = "split_type", length = 20)
     @Builder.Default
     SplitType splitType = SplitType.EVENLY;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    @Builder.Default
+    ExpenseStatus status = ExpenseStatus.UNPAID;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
