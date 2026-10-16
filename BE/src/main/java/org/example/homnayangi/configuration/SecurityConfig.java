@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -16,8 +17,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -57,9 +62,49 @@ public class SecurityConfig {
                 .build();
     }
 
+    // =========================================================================
+    // 1. CẤU HÌNH CORS CHO PHÉP FRONTEND REACT GỌI API
+    // =========================================================================
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Thêm các domain/port của Frontend cho phép truy cập:
+        // - http://localhost:3000: Cổng mặc định của Create React App / Next.js
+        // - http://localhost:5173: Cổng mặc định của Vite React
+        configuration.setAllowedOrigins(List.of(
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:5174"
+        ));
+
+        // Cho phép tất cả các HTTP Method cần thiết
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+
+        // Cho phép tất cả các Headers (bao gồm Content-Type, Authorization, v.v.)
+        configuration.setAllowedHeaders(List.of("*"));
+
+        // Cho phép truyền Credential (Cookie, Bearer Token)
+        configuration.setAllowCredentials(true);
+
+        // Thời gian cache cấu hình CORS preflight request (3600 giây = 1 tiếng)
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Áp dụng cấu hình CORS cho tất cả các endpoint trong hệ thống
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    // =========================================================================
+    // 2. CẤU HÌNH SECURITY FILTER CHAIN
+    // =========================================================================
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
+                // Bật CORS (Spring Security sẽ tự động nhặt Bean corsConfigurationSource ở trên)
+                .cors(Customizer.withDefaults())
+
                 .authorizeHttpRequests(request -> request
                         // 1. Swagger UI (Public)
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
@@ -67,47 +112,47 @@ public class SecurityConfig {
                         // 2. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
-                        // 3. BỔ SUNG: Cho phép User đã đăng nhập xem thông tin cá nhân của mình
+                        // 3. User cá nhân
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
 
-                        // 4. Tags: Cho phép User xem danh sách tag hệ thống
+                        // 4. Tags
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
-
-                        // 5. Tags: Cho phép User quản lý tag cá nhân (/me)
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                        // 6. Swipes: Cho phép User thực hiện quẹt, xem lịch sử và xem kết quả
+                        // 5. Swipes
                         .requestMatchers("/api/v1/swipes/**").authenticated()
 
-                        // 7. Friendships: Cho phép User gửi/chấp nhận/hủy lời mời kết bạn & xem danh sách bạn bè
+                        // 6. Friendships
                         .requestMatchers("/api/v1/friendships/**").authenticated()
 
-                        // 8. Rooms: Cho phép User tạo phòng, tham gia phòng, quản lý phòng
+                        // 7. Rooms
                         .requestMatchers("/api/v1/rooms/**").authenticated()
 
-                        // 9. Tất cả các endpoint /api/v1/** còn lại (Admin quản lý danh sách user, tags, places, v.v.)
+                        // 8. Expenses (Hóa đơn & Chia tiền)
+                        .requestMatchers("/api/v1/expenses/**").authenticated()
+
+                        // 9. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 );
 
-        // BỔ SUNG CẤU HÌNH JWT RESOURCE SERVER (ĐÃ BỊ THIẾU)
+        // Cấu hình OAuth2 Resource Server cho JWT
         httpSecurity.oauth2ResourceServer(oauth2 ->
                 oauth2.jwt(jwtConfigurer -> jwtConfigurer
                                 .decoder(jwtDecoder())
                                 .jwtAuthenticationConverter(jwtAuthenticationConverter())
                         )
-                        // Bắt lỗi 401 (Chưa đăng nhập / Token không hợp lệ)
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
-                        // Bắt lỗi 403 (Đã đăng nhập nhưng không đủ quyền)
                         .accessDeniedHandler(new JwtAccessDeniedHandler())
         );
 
-        // Tắt CSRF
+        // Tắt CSRF vì ứng dụng sử dụng JWT Token (Stateless)
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
         return httpSecurity.build();
     }
+
 
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {

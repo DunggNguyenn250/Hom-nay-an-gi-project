@@ -336,6 +336,31 @@ public class RoomService {
                 .toList();
     }
 
+    // 11. Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
+    @Transactional
+    public void closeRoom(UUID roomId) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 1. Chỉ Host mới có quyền đóng phòng
+        if (!room.getHost().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. Kiểm tra nếu phòng đã đóng rồi thì báo lỗi
+        if (room.getStatus() == RoomStatus.CLOSED) {
+            throw new AppException(ErrorCode.ROOM_ALREADY_CLOSED);
+        }
+
+        // 3. Chuyển trạng thái phòng thành CLOSED
+        room.setStatus(RoomStatus.CLOSED);
+        roomRepository.save(room);
+    }
+
     private User getCurrentUser() {
         var context = SecurityContextHolder.getContext();
         String name = context.getAuthentication().getName();

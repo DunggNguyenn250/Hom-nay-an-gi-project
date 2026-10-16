@@ -2,6 +2,7 @@ package org.example.homnayangi.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.homnayangi.enums.ExpenseStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ public class ExpenseResponse {
     UserResponse payer;
     BigDecimal totalAmount;
     String splitType;
+    ExpenseStatus status;
     LocalDateTime createdAt;
     List<ExpenseItemResponse> items;
     List<ExpenseSplitResponse> splits;

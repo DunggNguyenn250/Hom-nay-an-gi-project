@@ -6,6 +6,7 @@ import org.example.homnayangi.dto.request.ExpenseItemRequest;
 import org.example.homnayangi.dto.response.ExpenseResponse;
 import org.example.homnayangi.dto.response.ExpenseSplitResponse;
 import org.example.homnayangi.entity.*;
+import org.example.homnayangi.enums.ExpenseStatus;
 import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.enums.SplitType;
 import org.example.homnayangi.exception.AppException;
@@ -49,12 +50,7 @@ public class ExpenseService {
      */
     @Transactional
     public ExpenseResponse createExpense(ExpenseCreateRequest request) {
-        // --- Xác thực người dùng hiện tại ---
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-
-        // --- Kiểm tra phòng ---
+        // 1. Kiểm tra phòng
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
@@ -66,22 +62,20 @@ public class ExpenseService {
             throw new AppException(ErrorCode.EXPENSE_ALREADY_EXISTS);
         }
 
-        // --- Xác định người trả tiền (payer) ---
+        // 2. Kiểm tra Payer (Người trả tiền)
         User payer = userRepository.findById(request.getPayerId())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED)); // Dùng USER_NOT_EXISTED
 
-        // --- Lấy danh sách thành viên phòng ---
-        List<RoomMember> roomMembers = roomMemberRepository.findAllById_RoomId(room.getId());
-        Set<UUID> memberIds = roomMembers.stream()
-                .map(m -> m.getId().getUserId())
+        Set<UUID> memberIds = roomMemberRepository.findAllByRoomId(room.getId())
+                .stream()
+                .map(rm -> rm.getUser().getId())
                 .collect(Collectors.toSet());
 
-        // --- Kiểm tra payer phải là thành viên phòng ---
         if (!memberIds.contains(payer.getId())) {
-            throw new AppException(ErrorCode.USER_NOT_EXISTED);
+            throw new AppException(ErrorCode.PAYER_NOT_IN_ROOM);
         }
 
-        // --- Xác minh tổng tiền ---
+        // 3. Validate tổng tiền
         BigDecimal computedTotal = request.getItems().stream()
                 .map(ExpenseItemRequest::getPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -90,43 +84,64 @@ public class ExpenseService {
             throw new AppException(ErrorCode.BILL_AMOUNT_MISMATCH);
         }
 
-        // --- Xác định kiểu chia trước khi tạo Expense ---
-        SplitType splitType = request.getSplitType() != null ? request.getSplitType() : SplitType.EVENLY;
-
-        // --- Tạo Expense ---
+        // 4. Khởi tạo đối tượng Expense
         Expense expense = Expense.builder()
                 .room(room)
                 .payer(payer)
                 .totalAmount(request.getTotalAmount())
-                .splitType(splitType)
+                .splitType(request.getSplitType())
+                .status(ExpenseStatus.UNPAID)
+                .items(new ArrayList<>())
+                .splits(new ArrayList<>())
                 .build();
-        expense = expenseRepository.save(expense);
 
-        // --- Tạo ExpenseItems và ItemSharers ---
-        List<ExpenseItem> savedItems = saveExpenseItems(expense, request.getItems(), memberIds);
+// 5. Thêm các món ăn vào items
+        for (ExpenseItemRequest itemReq : request.getItems()) {
+            List<UUID> sharerIds = (itemReq.getSharerIds() == null || itemReq.getSharerIds().isEmpty())
+                    ? new ArrayList<>(memberIds)
+                    : itemReq.getSharerIds();
 
-        // --- Tính toán và tạo ExpenseSplits ---
-        Map<UUID, BigDecimal> splitAmounts;
+            for (UUID sharerId : sharerIds) {
+                if (!memberIds.contains(sharerId)) {
+                    throw new AppException(ErrorCode.SHARER_NOT_IN_ROOM);
+                }
+            }
 
-        if (splitType == SplitType.EVENLY) {
-            splitAmounts = calculateEvenSplit(request.getTotalAmount(), memberIds);
-        } else {
-            splitAmounts = calculateByItemSplit(savedItems, memberIds);
+            ExpenseItem item = ExpenseItem.builder()
+                    .expense(expense)
+                    .itemName(itemReq.getItemName())
+                    .price(itemReq.getPrice())
+                    .sharers(new ArrayList<>())
+                    .build();
+
+            for (UUID sharerId : sharerIds) {
+                User sharerUser = userRepository.getReferenceById(sharerId);
+
+
+                ItemSharerId sharerEmbeddedId = new ItemSharerId();
+                sharerEmbeddedId.setUserId(sharerId);
+
+                ItemSharer sharer = ItemSharer.builder()
+                        .id(sharerEmbeddedId)
+                        .user(sharerUser)
+                        .expenseItem(item)
+                        .build();
+
+                item.getSharers().add(sharer);
+            }
+
+            expense.getItems().add(item);
         }
 
-        saveSplits(expense, splitAmounts, memberIds);
+        // 6. Tính toán khoản nợ
+        List<ExpenseSplit> splits = calculateSplits(expense, memberIds);
+        expense.getSplits().addAll(splits);
 
-        // --- Trả về kết quả ---
-        Expense fullExpense = expenseRepository.findByIdWithDetails(expense.getId())
-                .orElseThrow(() -> new AppException(ErrorCode.EXPENSE_NOT_FOUND));
+        // 7. Lưu Expense (CascadeType.ALL tự động lưu toàn bộ items, sharers và splits)
+        Expense savedExpense = expenseRepository.save(expense);
 
-        // Load items với sharers
-        List<ExpenseItem> itemsWithSharers = expenseItemRepository.findAllByExpenseIdWithSharers(expense.getId());
-        fullExpense.setItems(itemsWithSharers);
-
-        return expenseMapper.toExpenseResponse(fullExpense);
+        return expenseMapper.toExpenseResponse(savedExpense);
     }
-
     // =========================================================================
     // 2. XEM HÓA ĐƠN
     // =========================================================================
@@ -228,6 +243,9 @@ public class ExpenseService {
         // Lấy lại split đã cập nhật
         split.setPaid(true);
 
+        // Cập nhật trạng thái của hóa đơn
+        updateExpenseStatus(expense);
+
         User debtor = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
@@ -252,25 +270,108 @@ public class ExpenseService {
         Expense expense = expenseRepository.findByIdWithDetails(expenseId)
                 .orElseThrow(() -> new AppException(ErrorCode.EXPENSE_NOT_FOUND));
 
+        // 1. Kiểm tra quyền: Chỉ Payer mới có quyền xác nhận thanh toán toàn bộ
         if (!expense.getPayer().getId().equals(currentUser.getId())) {
             throw new AppException(ErrorCode.NOT_EXPENSE_PAYER);
         }
 
-        // Đánh dấu tất cả splits là đã thanh toán
-        List<ExpenseSplit> splits = expenseSplitRepository.findAllById_ExpenseId(expenseId);
-        splits.forEach(s -> s.setPaid(true));
-        expenseSplitRepository.saveAll(splits);
+        // 2. Cập nhật tất cả khoản nợ (Splits) trực tiếp trên Managed Collection
+        if (expense.getSplits() != null) {
+            expense.getSplits().forEach(split -> split.setPaid(true));
+        }
 
-        List<ExpenseItem> itemsWithSharers = expenseItemRepository.findAllByExpenseIdWithSharers(expenseId);
-        expense.setItems(itemsWithSharers);
-        expense.setSplits(splits);
+        // 3. Cập nhật trạng thái hóa đơn
+        expense.setStatus(ExpenseStatus.FULLY_PAID);
 
-        return expenseMapper.toExpenseResponse(expense);
+        // 4. Lưu và trả về DTO
+        Expense savedExpense = expenseRepository.save(expense);
+        return expenseMapper.toExpenseResponse(savedExpense);
+    }
+
+    // =========================================================================
+    // 4. XÓA HÓA ĐƠN
+    // =========================================================================
+    @Transactional
+    public void deleteExpense(UUID expenseId) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        Expense expense = expenseRepository.findByIdWithDetails(expenseId)
+                .orElseThrow(() -> new AppException(ErrorCode.EXPENSE_NOT_FOUND));
+
+        // 1. Kiểm tra quyền: Chỉ Payer hoặc Host của phòng mới được xóa
+        boolean isPayer = expense.getPayer().getId().equals(currentUser.getId());
+        boolean isHost = expense.getRoom().getHost().getId().equals(currentUser.getId());
+
+        if (!isPayer && !isHost) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
+
+        // 2. Chỉ cho xóa khi chưa có ai thanh toán (UNPAID)
+        if (expense.getStatus() != ExpenseStatus.UNPAID) {
+            throw new AppException(ErrorCode.CANNOT_DELETE_PAID_EXPENSE);
+        }
+
+        expenseRepository.delete(expense);
     }
 
     // =========================================================================
     // PRIVATE HELPERS
     // =========================================================================
+
+    // =========================================================================
+    // HELPER: Hàm tính toán danh sách ExpenseSplit dựa trên SplitType
+    // =========================================================================
+    private List<ExpenseSplit> calculateSplits(Expense expense, Set<UUID> memberIds) {
+        Map<UUID, BigDecimal> splitAmounts;
+
+        if (expense.getSplitType() == SplitType.EVENLY) {
+            splitAmounts = calculateEvenSplit(expense.getTotalAmount(), memberIds);
+        } else {
+            splitAmounts = calculateByItemSplit(expense.getItems(), memberIds);
+        }
+
+        List<ExpenseSplit> splits = new ArrayList<>();
+        UUID payerId = expense.getPayer().getId();
+
+        for (Map.Entry<UUID, BigDecimal> entry : splitAmounts.entrySet()) {
+            UUID userId = entry.getKey();
+            BigDecimal amount = entry.getValue();
+
+            User user = userRepository.getReferenceById(userId);
+
+            ExpenseSplit split = ExpenseSplit.builder()
+                    .id(new ExpenseSplitId(expense.getId(), userId))
+                    .expense(expense)
+                    .user(user)
+                    .amountOwed(amount)
+                    // Payer (người trả tiền) sẽ được tự động đánh dấu paid = true
+                    .paid(userId.equals(payerId))
+                    .build();
+
+            splits.add(split);
+        }
+
+        return splits;
+    }
+
+    private void updateExpenseStatus(Expense expense) {
+        List<ExpenseSplit> splits = expenseSplitRepository.findAllById_ExpenseId(expense.getId());
+
+        long paidCount = splits.stream().filter(ExpenseSplit::isPaid).count();
+        int totalCount = splits.size();
+
+        if (paidCount == 0) {
+            expense.setStatus(ExpenseStatus.UNPAID);
+        } else if (paidCount == totalCount) {
+            expense.setStatus(ExpenseStatus.FULLY_PAID);
+        } else {
+            expense.setStatus(ExpenseStatus.PARTIALLY_PAID);
+        }
+
+        expenseRepository.save(expense);
+    }
 
     /**
      * Lưu các ExpenseItem và ItemSharer vào database.
@@ -283,40 +384,42 @@ public class ExpenseService {
         List<ExpenseItem> savedItems = new ArrayList<>();
 
         for (ExpenseItemRequest itemReq : itemRequests) {
-            // Xác định danh sách sharers
+            // 1. Xác định danh sách sharers
             List<UUID> sharerIds = (itemReq.getSharerIds() == null || itemReq.getSharerIds().isEmpty())
-                    ? new ArrayList<>(memberIds)  // Mặc định: tất cả thành viên
+                    ? new ArrayList<>(memberIds)
                     : itemReq.getSharerIds();
 
-            // Kiểm tra tất cả sharer phải là thành viên phòng
             for (UUID sharerId : sharerIds) {
                 if (!memberIds.contains(sharerId)) {
                     throw new AppException(ErrorCode.SHARER_NOT_IN_ROOM);
                 }
             }
 
-            // Tạo ExpenseItem
+            // 2. Tạo và lưu ExpenseItem
             ExpenseItem item = ExpenseItem.builder()
                     .expense(expense)
                     .itemName(itemReq.getItemName())
                     .price(itemReq.getPrice())
                     .build();
-            item = expenseItemRepository.save(item);
+            ExpenseItem savedItem = expenseItemRepository.save(item);
 
-            // Tạo ItemSharers
+            // 3. Tạo danh sách ItemSharer
             List<ItemSharer> sharers = new ArrayList<>();
             for (UUID sharerId : sharerIds) {
                 User sharerUser = userRepository.getReferenceById(sharerId);
                 ItemSharer sharer = ItemSharer.builder()
-                        .id(new ItemSharerId(item.getId(), sharerId))
-                        .expenseItem(item)
+                        .id(new ItemSharerId(savedItem.getId(), sharerId))
+                        .expenseItem(savedItem)
                         .user(sharerUser)
                         .build();
                 sharers.add(sharer);
             }
-            itemSharerRepository.saveAll(sharers);
-            item.setSharers(sharers);
-            savedItems.add(item);
+
+            // SỬA TẠI ĐÂY: Hứng lại danh sách đã được Persistence Context Quản lý (Managed)
+            List<ItemSharer> savedSharers = itemSharerRepository.saveAll(sharers);
+
+            savedItem.setSharers(savedSharers);
+            savedItems.add(savedItem);
         }
 
         return savedItems;

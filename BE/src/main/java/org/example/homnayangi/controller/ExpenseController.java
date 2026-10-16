@@ -45,6 +45,7 @@ public class ExpenseController {
     @GetMapping("/{expenseId}")
     public ApiResponse<ExpenseResponse> getExpenseById(@PathVariable UUID expenseId) {
         return ApiResponse.<ExpenseResponse>builder()
+                .message("Lấy chi tiết hóa đơn thành công")
                 .result(expenseService.getExpenseById(expenseId))
                 .build();
     }
@@ -56,6 +57,7 @@ public class ExpenseController {
     @GetMapping("/room/{roomId}")
     public ApiResponse<List<ExpenseResponse>> getExpensesByRoom(@PathVariable UUID roomId) {
         return ApiResponse.<List<ExpenseResponse>>builder()
+                .message("Lấy danh sách hóa đơn của phòng thành công")
                 .result(expenseService.getExpensesByRoom(roomId))
                 .build();
     }
@@ -96,6 +98,19 @@ public class ExpenseController {
         return ApiResponse.<ExpenseResponse>builder()
                 .message("Đã xác nhận thanh toán toàn bộ hóa đơn")
                 .result(expenseService.markAllSplitsAsPaid(expenseId))
+                .build();
+    }
+
+    // =========================================================================
+    // DELETE /api/v1/expenses/{expenseId}
+    // Xóa hóa đơn (Chỉ Payer hoặc Host, và hóa đơn ở trạng thái UNPAID)
+    // =========================================================================
+    @DeleteMapping("/{expenseId}")
+    public ApiResponse<String> deleteExpense(@PathVariable UUID expenseId) {
+        expenseService.deleteExpense(expenseId);
+        return ApiResponse.<String>builder()
+                .message("Xóa hóa đơn thành công")
+                .result("Đã xóa hóa đơn thành công")
                 .build();
     }
 }

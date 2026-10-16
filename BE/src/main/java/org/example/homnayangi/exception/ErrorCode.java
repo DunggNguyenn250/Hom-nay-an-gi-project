@@ -35,7 +35,8 @@ public enum ErrorCode {
     ROOM_NOT_SWIPING(2008, "Phòng này chưa bắt đầu hoặc đã kết thúc quẹt", HttpStatus.BAD_REQUEST),
     ROOM_BUSY(2009, "Phòng ăn đang bận xử lý lượt quẹt, vui lòng thử lại sau", HttpStatus.TOO_MANY_REQUESTS),
     CANNOT_KICK_SELF(2010, "Trưởng phòng không thể tự xóa chính mình ra khỏi phòng", HttpStatus.BAD_REQUEST), // 🌟 Bổ sung
-    ROOM_LOCATION_NOT_SET(2011, "Phòng ăn chưa được thiết lập tọa độ vị trí", HttpStatus.BAD_REQUEST),
+    ROOM_ALREADY_CLOSED(2011, "Phòng ăn đã đóng trước đó", HttpStatus.BAD_REQUEST),
+    ROOM_LOCATION_NOT_SET(2012, "Phòng ăn chưa được thiết lập tọa độ vị trí", HttpStatus.BAD_REQUEST),
 
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),
@@ -47,9 +48,11 @@ public enum ErrorCode {
     NOT_EXPENSE_PAYER(3007, "Chỉ người trả tiền mới có thể thực hiện thao tác này", HttpStatus.FORBIDDEN),
     INVALID_SPLIT_TYPE(3008, "Kiểu chia tiền không hợp lệ, chỉ chấp nhận EVENLY hoặc BY_ITEM", HttpStatus.BAD_REQUEST),
     SHARER_NOT_IN_ROOM(3009, "Người chia sẻ món ăn phải là thành viên trong phòng", HttpStatus.BAD_REQUEST),
+    PAYER_NOT_IN_ROOM(3010, "Người thanh toán phải là thành viên trong phòng ăn", HttpStatus.BAD_REQUEST), // 👉 Bổ sung dòng này
 
     // === 6. LỖI DỊCH VỤ BÊN NGOÀI (4000 - 4099) ===
     EXTERNAL_SERVICE_ERROR(4001, "Dịch vụ bên thứ ba (Google Maps/VietQR) gặp sự cố", HttpStatus.SERVICE_UNAVAILABLE),
+    CANNOT_DELETE_PAID_EXPENSE(4002, "Hóa đơn đã có thành viên thanh toán, không thể xóa", HttpStatus.BAD_REQUEST),
 
     // === 7. LỖI QUẢN LÝ ĐỊA ĐIỂM (1200 - 1299) ===
     PLACE_NOT_FOUND(1201, "Địa điểm không tồn tại", HttpStatus.NOT_FOUND),

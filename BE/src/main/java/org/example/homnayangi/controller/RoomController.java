@@ -137,4 +137,14 @@ public class RoomController {
                 .result("Đã xóa phòng ăn thành công")
                 .build();
     }
+
+    // 11. Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
+    @PostMapping("/{roomId}/close")
+    public ApiResponse<Void> closeRoom(@PathVariable UUID roomId) {
+        roomService.closeRoom(roomId);
+        return ApiResponse.<Void>builder()
+                .code(1000)
+                .message("Đã đóng phòng ăn thành công")
+                .build();
+    }
 }
