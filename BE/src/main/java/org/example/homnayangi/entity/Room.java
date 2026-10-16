@@ -6,6 +6,7 @@ import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.enums.RoomStatus;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -42,6 +43,20 @@ public class Room {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "matched_place_id")
     Place matchedPlace;
+
+    @Column(name = "latitude", precision = 10, scale = 8)
+    BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 11, scale = 8)
+    BigDecimal longitude;
+
+    @Column(name = "radius")
+    @Builder.Default
+    Double radius = 5.0;
+
+    @Column(name = "deck_size")
+    @Builder.Default
+    Integer deckSize = 15;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

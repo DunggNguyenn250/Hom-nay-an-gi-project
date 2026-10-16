@@ -51,3 +51,4 @@ yarn-error.log*
 .env.local
 .env.*.local
 graphify-out/
+.agents/

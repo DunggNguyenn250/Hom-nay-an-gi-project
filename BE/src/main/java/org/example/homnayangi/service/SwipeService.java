@@ -33,6 +33,7 @@ public class SwipeService {
     UserRepository userRepository;
     PlaceRepository placeRepository;
     RoomMemberRepository roomMemberRepository;
+    RoomPlaceRepository roomPlaceRepository;
     SwipeMapper swipeMapper; // 🌟 Tiêm Mapper vào Service
     RedisTemplate<String, Object> redisTemplate;
     PlatformTransactionManager transactionManager;
@@ -73,8 +74,20 @@ public class SwipeService {
                     throw new AppException(ErrorCode.ROOM_NOT_SWIPING);
                 }
 
+                // 1. Kiểm tra User có phải thành viên của phòng không
+                RoomMemberId memberId = new RoomMemberId(room.getId(), user.getId());
+                if (!roomMemberRepository.existsById(memberId)) {
+                    throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
+                }
+
                 Place place = placeRepository.findById(request.getPlaceId())
                         .orElseThrow(() -> new AppException(ErrorCode.PLACE_NOT_FOUND));
+
+                // 2. Kiểm tra Place có thực sự thuộc Deck (room_places) của phòng không
+                boolean isPlaceInDeck = roomPlaceRepository.existsById_RoomIdAndId_PlaceId(room.getId(), place.getId());
+                if (!isPlaceInDeck) {
+                    throw new AppException(ErrorCode.PLACE_NOT_IN_ROOM_DECK);
+                }
 
                 Swipe swipe = Swipe.builder()
                         .room(room)
@@ -107,6 +120,12 @@ public class SwipeService {
             throw new AppException(ErrorCode.ROOM_NOT_FOUND);
         }
 
+        // Kiểm tra quyền thành viên trong phòng
+        RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
+        if (!roomMemberRepository.existsById(memberId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
         List<Swipe> userSwipes = swipeRepository.findAllByUserIdAndRoomId(currentUser.getId(), roomId);
 
         return userSwipes.stream()
@@ -117,8 +136,16 @@ public class SwipeService {
     // 🌟 API 2: Thống kê kết quả quẹt của cả phòng
     @Transactional(readOnly = true)
     public List<RoomPlaceResultResponse> getRoomSwipeResults(UUID roomId) {
+        User currentUser = getCurrentUser();
+
         if (!roomRepository.existsById(roomId)) {
             throw new AppException(ErrorCode.ROOM_NOT_FOUND);
+        }
+
+        // Kiểm tra quyền thành viên trong phòng
+        RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
+        if (!roomMemberRepository.existsById(memberId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
         }
 
         List<Swipe> allSwipes = swipeRepository.findAllByRoomId(roomId);
@@ -135,7 +162,7 @@ public class SwipeService {
 
             results.add(RoomPlaceResultResponse.builder()
                     .placeId(place.getId())
-                    .placeName(place.getName()) // Thay 'getName()' bằng trường tên tương ứng của Place entity
+                    .placeName(place.getName())
                     .totalLikes(totalLikes)
                     .totalDislikes(totalDislikes)
                     .build());

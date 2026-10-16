@@ -4,26 +4,25 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.CreateRoomRequest;
+import org.example.homnayangi.dto.response.PlaceResponse;
 import org.example.homnayangi.dto.response.RoomResponse;
 import org.example.homnayangi.dto.response.UserResponse;
-import org.example.homnayangi.entity.Room;
-import org.example.homnayangi.entity.RoomMember;
-import org.example.homnayangi.entity.RoomMemberId;
-import org.example.homnayangi.entity.User;
+import org.example.homnayangi.entity.*;
 import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
+import org.example.homnayangi.mapper.PlaceMapper;
 import org.example.homnayangi.mapper.RoomMapper;
 import org.example.homnayangi.mapper.UserMapper;
-import org.example.homnayangi.repository.RoomMemberRepository;
-import org.example.homnayangi.repository.RoomRepository;
-import org.example.homnayangi.repository.UserRepository;
+import org.example.homnayangi.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,11 +31,17 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RoomService {
 
+    static final int MIN_DECK_SIZE = 3;
+
     RoomRepository roomRepository;
     RoomMemberRepository roomMemberRepository;
     UserRepository userRepository;
+    RoomPlaceRepository roomPlaceRepository;
+    PlaceRepository placeRepository;
+    FoursquareService foursquareService;
     UserMapper userMapper;
     RoomMapper roomMapper;
+    PlaceMapper placeMapper;
 
     // 1. Tạo phòng mới
     @Transactional
@@ -44,7 +49,11 @@ public class RoomService {
         User host = getCurrentUser();
 
         Room newRoom = Room.builder()
-                .name(request.getName()) // 👈 Set tên phòng từ Request
+                .name(request.getName())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .radius(request.getRadius() != null ? request.getRadius() : 5.0)
+                .deckSize(request.getDeckSize() != null ? request.getDeckSize() : 15)
                 .host(host)
                 .status(RoomStatus.OPEN)
                 .roomCode(generateUniqueRoomCode())
@@ -95,7 +104,7 @@ public class RoomService {
         return getRoomDetails(room.getId()); // Trả về RoomResponse đầy đủ thông tin thành viên
     }
 
-    // 3. Lấy danh sách phòng của tôi (Không lọc trạng thái, lấy tất cả phòng đã tham gia)
+    // 3. Lấy danh sách phòng của tôi (Không cần danh sách thành viên chi tiết)
     @Transactional(readOnly = true)
     public List<RoomResponse> getMyRooms() {
         User currentUser = getCurrentUser();
@@ -104,10 +113,11 @@ public class RoomService {
 
         List<Room> rooms = myMemberships.stream()
                 .map(RoomMember::getRoom)
-                // Đã bỏ dòng filter CLOSED để lấy luôn phòng đã đóng
+                .filter(room -> room.getStatus() != RoomStatus.CLOSED)
                 .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
                 .toList();
 
+        // Map trực tiếp từ Room sang RoomResponse (members sẽ là null/rỗng)
         return rooms.stream()
                 .map(roomMapper::toRoomResponse)
                 .toList();
@@ -148,6 +158,12 @@ public class RoomService {
 
         if (!room.getHost().getId().equals(user.getId())) {
             throw new AppException(ErrorCode.NOT_ROOM_HOST);
+        }
+
+        // Tự động sinh và khóa Deck nếu phòng chưa có bộ bài (Tránh desync giữa start và deck)
+        List<RoomPlace> existingDeck = roomPlaceRepository.findAllByRoomIdWithPlace(roomId);
+        if (existingDeck.isEmpty()) {
+            generateOrGetDeck(roomId);
         }
 
         room.setStatus(RoomStatus.SWIPING);
@@ -197,21 +213,6 @@ public class RoomService {
         roomMemberRepository.delete(member);
     }
 
-    private User getCurrentUser() {
-        var context = SecurityContextHolder.getContext();
-        String name = context.getAuthentication().getName();
-        return userRepository.findByUsername(name)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
-    }
-
-    private String generateUniqueRoomCode() {
-        String roomCode;
-        do {
-            roomCode = RandomStringUtils.randomAlphanumeric(6).toUpperCase();
-        } while (roomRepository.findByRoomCode(roomCode).isPresent());
-        return roomCode;
-    }
-
     // 8. Host xóa hoàn toàn phòng ăn
     @Transactional
     public void deleteRoom(UUID roomId) {
@@ -226,7 +227,8 @@ public class RoomService {
             throw new AppException(ErrorCode.NOT_ROOM_HOST);
         }
 
-        // 3. Xóa toàn bộ bản ghi thành viên trong phòng trước (tránh lỗi Foreign Key / Khóa ngoại DB)
+        // 3. Xóa các bản ghi liên quan trong phòng trước (tránh lỗi Foreign Key)
+        roomPlaceRepository.deleteAllById_RoomId(roomId);
         List<RoomMember> roomMembers = roomMemberRepository.findAllByRoomId(roomId);
         roomMemberRepository.deleteAll(roomMembers);
 
@@ -234,6 +236,107 @@ public class RoomService {
         roomRepository.delete(room);
     }
 
+    // 9. Khởi tạo hoặc lấy lại bộ bài quẹt cho phòng (Smart Hybrid Fill + Idempotency)
+    @Transactional
+    public List<PlaceResponse> generateOrGetDeck(UUID roomId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+
+        User currentUser = getCurrentUser();
+        RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
+        if (!roomMemberRepository.existsById(memberId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        // a) Kiểm tra phòng đã thiết lập tọa độ chưa
+        if (room.getLatitude() == null || room.getLongitude() == null) {
+            throw new AppException(ErrorCode.ROOM_LOCATION_NOT_SET);
+        }
+
+        // b) Tính lũy đẳng (Idempotency): Kiểm tra trong room_places xem phòng đã có danh sách quán chưa
+        List<RoomPlace> existingRoomPlaces = roomPlaceRepository.findAllByRoomIdWithPlace(roomId);
+        if (!existingRoomPlaces.isEmpty()) {
+            return existingRoomPlaces.stream()
+                    .map(RoomPlace::getPlace)
+                    .map(placeMapper::toPlaceResponse)
+                    .toList();
+        }
+
+        // c) Xác định số lượng quán mục tiêu cho Deck
+        int targetSize = (room.getDeckSize() != null && room.getDeckSize() > 0) ? room.getDeckSize() : 15;
+
+        double lat = room.getLatitude().doubleValue();
+        double lon = room.getLongitude().doubleValue();
+        double radius = room.getRadius() != null ? room.getRadius() : 5.0;
+
+        // d) Ưu tiên quét quán ăn từ Database nội bộ (tái sử dụng query Haversine)
+        List<Place> pool = new ArrayList<>(placeRepository.findNearbyPlaces(lat, lon, radius));
+
+        // e) Nếu DB thiếu quán (< targetSize), gọi Foursquare Places API để bù đắp
+        if (pool.size() < targetSize) {
+            List<Place> fsqPlaces = foursquareService.fetchNearbyRestaurants(lat, lon, radius, targetSize * 2);
+
+            for (Place fsqPlace : fsqPlaces) {
+                // Chỉ lưu vào DB nếu quán chưa tồn tại
+                if (!placeRepository.existsByName(fsqPlace.getName())) {
+                    Place saved = placeRepository.save(fsqPlace);
+                    pool.add(saved);
+                }
+            }
+        }
+
+        // Chốt chặn bảo vệ: Nếu sau cả DB lẫn External API mà vẫn không đủ số quán tối thiểu
+        if (pool.size() < MIN_DECK_SIZE) {
+            throw new AppException(ErrorCode.NO_PLACES_NEARBY);
+        }
+
+        // f) Chọn quán từ pool: Xáo trộn ngẫu nhiên để bộ bài luôn phong phú, lấy tối đa targetSize quán
+        List<Place> selectedPlaces;
+        if (pool.size() > targetSize) {
+            Collections.shuffle(pool);
+            selectedPlaces = pool.subList(0, targetSize);
+        } else {
+            selectedPlaces = pool;
+        }
+
+        // g) Tạo các bản ghi RoomPlace gắn kết roomId với các Place vừa chọn và lưu vào room_places
+        List<RoomPlace> newRoomPlaces = selectedPlaces.stream()
+                .map(place -> RoomPlace.builder()
+                        .id(new RoomPlaceId(room.getId(), place.getId()))
+                        .room(room)
+                        .place(place)
+                        .createdAt(LocalDateTime.now())
+                        .build())
+                .toList();
+
+        roomPlaceRepository.saveAll(newRoomPlaces);
+
+        // h) Map danh sách Place sang DTO phản hồi chuẩn (List<PlaceResponse>)
+        return selectedPlaces.stream()
+                .map(placeMapper::toPlaceResponse)
+                .toList();
+    }
+
+    // 10. Lấy danh sách bộ bài quẹt đã khóa của phòng (dành cho thành viên xem lại/lấy bài)
+    @Transactional(readOnly = true)
+    public List<PlaceResponse> getDeck(UUID roomId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+
+        User currentUser = getCurrentUser();
+        RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
+        if (!roomMemberRepository.existsById(memberId)) {
+            throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
+        }
+
+        List<RoomPlace> roomPlaces = roomPlaceRepository.findAllByRoomIdWithPlace(roomId);
+        return roomPlaces.stream()
+                .map(RoomPlace::getPlace)
+                .map(placeMapper::toPlaceResponse)
+                .toList();
+    }
+
+    // 11. Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
     @Transactional
     public void closeRoom(UUID roomId) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -256,5 +359,20 @@ public class RoomService {
         // 3. Chuyển trạng thái phòng thành CLOSED
         room.setStatus(RoomStatus.CLOSED);
         roomRepository.save(room);
+    }
+
+    private User getCurrentUser() {
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+        return userRepository.findByUsername(name)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    private String generateUniqueRoomCode() {
+        String roomCode;
+        do {
+            roomCode = RandomStringUtils.randomAlphanumeric(6).toUpperCase();
+        } while (roomRepository.findByRoomCode(roomCode).isPresent());
+        return roomCode;
     }
 }

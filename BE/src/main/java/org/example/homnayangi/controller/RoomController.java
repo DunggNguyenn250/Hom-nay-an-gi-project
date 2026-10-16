@@ -1,10 +1,12 @@
 package org.example.homnayangi.controller;
 
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.CreateRoomRequest;
 import org.example.homnayangi.dto.response.ApiResponse;
+import org.example.homnayangi.dto.response.PlaceResponse;
 import org.example.homnayangi.dto.response.RoomResponse;
 import org.example.homnayangi.entity.Room;
 import org.example.homnayangi.mapper.RoomMapper;
@@ -25,7 +27,7 @@ public class RoomController {
 
     // 1. Tạo phòng mới
     @PostMapping
-    public ApiResponse<RoomResponse> createRoom(@RequestBody CreateRoomRequest request) {
+    public ApiResponse<RoomResponse> createRoom(@RequestBody @Valid CreateRoomRequest request) {
         RoomResponse roomResponse = roomService.createRoom(request);
         return ApiResponse.<RoomResponse>builder()
                 .code(1000)
@@ -78,7 +80,29 @@ public class RoomController {
                 .build();
     }
 
-    // 6. Thành viên tự rời khỏi phòng
+    // 6. Khởi tạo hoặc lấy lại bộ bài quẹt cho phòng (Idempotency)
+    @PostMapping("/{roomId}/deck")
+    public ApiResponse<List<PlaceResponse>> generateDeck(@PathVariable UUID roomId) {
+        List<PlaceResponse> deck = roomService.generateOrGetDeck(roomId);
+        return ApiResponse.<List<PlaceResponse>>builder()
+                .code(1000)
+                .message("Khởi tạo bộ bài quẹt cho phòng thành công")
+                .result(deck)
+                .build();
+    }
+
+    // 7. Lấy danh sách bộ bài quẹt đã khóa của phòng
+    @GetMapping("/{roomId}/deck")
+    public ApiResponse<List<PlaceResponse>> getDeck(@PathVariable UUID roomId) {
+        List<PlaceResponse> deck = roomService.getDeck(roomId);
+        return ApiResponse.<List<PlaceResponse>>builder()
+                .code(1000)
+                .message("Lấy danh sách bộ bài quẹt thành công")
+                .result(deck)
+                .build();
+    }
+
+    // 8. Thành viên tự rời khỏi phòng
     @DeleteMapping("/{roomId}/leave")
     public ApiResponse<String> leaveRoom(@PathVariable UUID roomId) {
         roomService.leaveRoom(roomId);
@@ -89,7 +113,7 @@ public class RoomController {
                 .build();
     }
 
-    // 7. Host xóa (kick) thành viên ra khỏi phòng
+    // 9. Host xóa (kick) thành viên ra khỏi phòng
     @DeleteMapping("/{roomId}/members/{memberUserId}")
     public ApiResponse<String> kickMember(
             @PathVariable UUID roomId,
@@ -103,7 +127,7 @@ public class RoomController {
                 .build();
     }
 
-    // 8. Host xóa hoàn toàn phòng ăn
+    // 10. Host xóa hoàn toàn phòng ăn
     @DeleteMapping("/{roomId}")
     public ApiResponse<String> deleteRoom(@PathVariable UUID roomId) {
         roomService.deleteRoom(roomId);
@@ -113,7 +137,8 @@ public class RoomController {
                 .result("Đã xóa phòng ăn thành công")
                 .build();
     }
-    // Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
+
+    // 11. Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
     @PostMapping("/{roomId}/close")
     public ApiResponse<Void> closeRoom(@PathVariable UUID roomId) {
         roomService.closeRoom(roomId);
@@ -122,6 +147,4 @@ public class RoomController {
                 .message("Đã đóng phòng ăn thành công")
                 .build();
     }
-
-
 }

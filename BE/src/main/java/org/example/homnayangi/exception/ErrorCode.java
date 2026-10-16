@@ -22,7 +22,7 @@ public enum ErrorCode {
     USERNAME_INVALID(1101, "Tên đăng nhập phải có ít nhất 3 ký tự", HttpStatus.BAD_REQUEST),
     PASSWORD_INVALID(1102, "Mật khẩu phải có ít nhất 6 ký tự", HttpStatus.BAD_REQUEST),
     EMAIL_INVALID(1103, "Email không đúng định dạng", HttpStatus.BAD_REQUEST),
-    INVALID_ROLE(1104, "Quyền người dùng không hợp lệ", HttpStatus.BAD_REQUEST), // 👈 Thêm dòng này
+    INVALID_ROLE(1104, "Quyền người dùng không hợp lệ", HttpStatus.BAD_REQUEST), // 👉 Thêm dòng này
 
     // === 4. LỖI QUẢN LÝ PHÒNG & GHÉP CẶP (2000 - 2099) ===
     ROOM_NOT_FOUND(2001, "Không tìm thấy phòng ăn", HttpStatus.NOT_FOUND),
@@ -36,6 +36,7 @@ public enum ErrorCode {
     ROOM_BUSY(2009, "Phòng ăn đang bận xử lý lượt quẹt, vui lòng thử lại sau", HttpStatus.TOO_MANY_REQUESTS),
     CANNOT_KICK_SELF(2010, "Trưởng phòng không thể tự xóa chính mình ra khỏi phòng", HttpStatus.BAD_REQUEST), // 🌟 Bổ sung
     ROOM_ALREADY_CLOSED(2011, "Phòng ăn đã đóng trước đó", HttpStatus.BAD_REQUEST),
+    ROOM_LOCATION_NOT_SET(2012, "Phòng ăn chưa được thiết lập tọa độ vị trí", HttpStatus.BAD_REQUEST),
 
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),
@@ -47,7 +48,7 @@ public enum ErrorCode {
     NOT_EXPENSE_PAYER(3007, "Chỉ người trả tiền mới có thể thực hiện thao tác này", HttpStatus.FORBIDDEN),
     INVALID_SPLIT_TYPE(3008, "Kiểu chia tiền không hợp lệ, chỉ chấp nhận EVENLY hoặc BY_ITEM", HttpStatus.BAD_REQUEST),
     SHARER_NOT_IN_ROOM(3009, "Người chia sẻ món ăn phải là thành viên trong phòng", HttpStatus.BAD_REQUEST),
-    PAYER_NOT_IN_ROOM(3010, "Người thanh toán phải là thành viên trong phòng ăn", HttpStatus.BAD_REQUEST), // 👈 Bổ sung dòng này
+    PAYER_NOT_IN_ROOM(3010, "Người thanh toán phải là thành viên trong phòng ăn", HttpStatus.BAD_REQUEST), // 👉 Bổ sung dòng này
 
     // === 6. LỖI DỊCH VỤ BÊN NGOÀI (4000 - 4099) ===
     EXTERNAL_SERVICE_ERROR(4001, "Dịch vụ bên thứ ba (Google Maps/VietQR) gặp sự cố", HttpStatus.SERVICE_UNAVAILABLE),
@@ -58,6 +59,8 @@ public enum ErrorCode {
     PLACE_NAME_INVALID(1202, "Tên địa điểm không được để trống", HttpStatus.BAD_REQUEST),
     PLACE_LATITUDE_INVALID(1203, "Vĩ độ không hợp lệ", HttpStatus.BAD_REQUEST),
     PLACE_LONGITUDE_INVALID(1204, "Kinh độ không hợp lệ", HttpStatus.BAD_REQUEST),
+    PLACE_NOT_IN_ROOM_DECK(1205, "Quán ăn này không nằm trong bộ bài quẹt của phòng", HttpStatus.BAD_REQUEST),
+    NO_PLACES_NEARBY(1206, "Không tìm thấy đủ quán ăn trong khu vực này. Vui lòng tăng bán kính tìm kiếm.", HttpStatus.BAD_REQUEST),
 
     // === 8. LỖI BẠN BÈ & SỞ THÍCH (1300 - 1399) ===
     FRIENDSHIP_ALREADY_EXISTS(1301, "Yêu cầu kết bạn hoặc quan hệ bạn bè đã tồn tại", HttpStatus.BAD_REQUEST),

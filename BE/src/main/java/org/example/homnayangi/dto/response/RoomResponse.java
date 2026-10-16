@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.enums.RoomStatus;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,10 @@ public class RoomResponse {
     UserResponse host;
     RoomStatus status;
     PlaceResponse matchedPlace;
+    BigDecimal latitude;
+    BigDecimal longitude;
+    Double radius;
+    Integer deckSize;
     LocalDateTime createdAt;
     List<UserResponse> members;
 }
