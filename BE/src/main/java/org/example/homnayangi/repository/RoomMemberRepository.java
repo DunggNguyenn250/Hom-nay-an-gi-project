@@ -10,6 +10,8 @@ import java.util.UUID;
 public interface RoomMemberRepository extends JpaRepository<RoomMember, RoomMemberId> {
     List<RoomMember> findAllById_RoomId(UUID roomId);
 
+    long countById_RoomId(UUID roomId);
+
     List<RoomMember> findAllByUserId(UUID userId);
 
     List<RoomMember> findAllByRoomId(UUID roomId);

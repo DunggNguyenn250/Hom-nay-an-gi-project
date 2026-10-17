@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.CreateRoomRequest;
+import org.example.homnayangi.dto.request.SelectPlaceRequest;
 import org.example.homnayangi.dto.response.ApiResponse;
 import org.example.homnayangi.dto.response.PlaceResponse;
 import org.example.homnayangi.dto.response.RoomResponse;
@@ -145,6 +146,20 @@ public class RoomController {
         return ApiResponse.<Void>builder()
                 .code(1000)
                 .message("Đã đóng phòng ăn thành công")
+                .build();
+    }
+
+    // 12. Host chủ động chọn/chốt quán ăn cho phòng (khi hòa điểm hoặc chốt sớm)
+    @PostMapping("/{roomId}/select-place")
+    public ApiResponse<RoomResponse> selectPlace(
+            @PathVariable UUID roomId,
+            @RequestBody @Valid SelectPlaceRequest request
+    ) {
+        RoomResponse roomResponse = roomService.selectPlace(roomId, request);
+        return ApiResponse.<RoomResponse>builder()
+                .code(1000)
+                .message("Chốt quán ăn cho phòng thành công")
+                .result(roomResponse)
                 .build();
     }
 }

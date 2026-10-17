@@ -34,7 +34,7 @@ public class SwipeService {
     PlaceRepository placeRepository;
     RoomMemberRepository roomMemberRepository;
     RoomPlaceRepository roomPlaceRepository;
-    SwipeMapper swipeMapper; // 🌟 Tiêm Mapper vào Service
+    SwipeMapper swipeMapper;
     RedisTemplate<String, Object> redisTemplate;
     PlatformTransactionManager transactionManager;
 
@@ -89,6 +89,11 @@ public class SwipeService {
                     throw new AppException(ErrorCode.PLACE_NOT_IN_ROOM_DECK);
                 }
 
+                // 3. Kiểm tra xem User đã quẹt địa điểm này trong phòng chưa
+                if (swipeRepository.existsByRoomIdAndUserIdAndPlaceId(room.getId(), user.getId(), place.getId())) {
+                    throw new AppException(ErrorCode.ALREADY_SWIPED);
+                }
+
                 Swipe swipe = Swipe.builder()
                         .room(room)
                         .user(user)
@@ -98,9 +103,7 @@ public class SwipeService {
 
                 swipeRepository.save(swipe);
 
-                if (request.isLiked()) {
-                    checkForMatch(room, place);
-                }
+                checkForMatch(room, place, request.isLiked());
             });
         } finally {
             Object currentLockValue = redisTemplate.opsForValue().get(lockKey);
@@ -133,14 +136,13 @@ public class SwipeService {
                 .toList();
     }
 
-    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng
+    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng (hiển thị đầy đủ tất cả quán trong Deck kèm cờ matched)
     @Transactional(readOnly = true)
     public List<RoomPlaceResultResponse> getRoomSwipeResults(UUID roomId) {
         User currentUser = getCurrentUser();
 
-        if (!roomRepository.existsById(roomId)) {
-            throw new AppException(ErrorCode.ROOM_NOT_FOUND);
-        }
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
         // Kiểm tra quyền thành viên trong phòng
         RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
@@ -149,24 +151,29 @@ public class SwipeService {
         }
 
         List<Swipe> allSwipes = swipeRepository.findAllByRoomId(roomId);
+        List<RoomPlace> deckPlaces = roomPlaceRepository.findAllByRoomIdWithPlace(roomId);
 
-        // Gom nhóm theo Place và đếm lượt Like / Dislike
-        Map<Place, List<Swipe>> swipesByPlace = allSwipes.stream()
-                .collect(Collectors.groupingBy(Swipe::getPlace));
+        Map<UUID, List<Swipe>> swipesByPlaceId = allSwipes.stream()
+                .collect(Collectors.groupingBy(s -> s.getPlace().getId()));
 
         List<RoomPlaceResultResponse> results = new ArrayList<>();
+        UUID matchedPlaceId = (room.getMatchedPlace() != null) ? room.getMatchedPlace().getId() : null;
 
-        swipesByPlace.forEach((place, swipes) -> {
-            long totalLikes = swipes.stream().filter(Swipe::isLiked).count();
-            long totalDislikes = swipes.size() - totalLikes;
+        for (RoomPlace rp : deckPlaces) {
+            Place place = rp.getPlace();
+            List<Swipe> placeSwipes = swipesByPlaceId.getOrDefault(place.getId(), Collections.emptyList());
+            long totalLikes = placeSwipes.stream().filter(Swipe::isLiked).count();
+            long totalDislikes = placeSwipes.size() - totalLikes;
+            boolean isMatched = matchedPlaceId != null && matchedPlaceId.equals(place.getId());
 
             results.add(RoomPlaceResultResponse.builder()
                     .placeId(place.getId())
                     .placeName(place.getName())
                     .totalLikes(totalLikes)
                     .totalDislikes(totalDislikes)
+                    .matched(isMatched)
                     .build());
-        });
+        }
 
         // Sắp xếp địa điểm được yêu thích nhiều nhất lên đầu
         results.sort((a, b) -> Long.compare(b.getTotalLikes(), a.getTotalLikes()));
@@ -174,16 +181,63 @@ public class SwipeService {
         return results;
     }
 
-    private void checkForMatch(Room room, Place place) {
+    private void checkForMatch(Room room, Place place, boolean isLiked) {
         List<RoomMember> members = roomMemberRepository.findAllById_RoomId(room.getId());
         long totalMembers = members.size();
+        if (totalMembers == 0) {
+            return;
+        }
 
-        long likeCount = swipeRepository.countByRoomAndPlaceAndLiked(room, place, true);
+        // 1. Luồng 1: Match tức thì khi 100% thành viên cùng bấm Like quán này
+        if (isLiked) {
+            long likeCount = swipeRepository.countByRoomAndPlaceAndLiked(room, place, true);
+            if (likeCount == totalMembers) {
+                room.setMatchedPlace(place);
+                room.setStatus(RoomStatus.CLOSED);
+                roomRepository.save(room);
+                return;
+            }
+        }
 
-        if (likeCount == totalMembers) {
-            room.setMatchedPlace(place);
-            room.setStatus(RoomStatus.CLOSED);
-            roomRepository.save(room);
+        // 2. Luồng 2: Kiểm tra khi TẤT CẢ thành viên đã quẹt xong toàn bộ bộ bài (Deck)
+        long totalDeckPlaces = roomPlaceRepository.countById_RoomId(room.getId());
+        if (totalDeckPlaces == 0) {
+            return;
+        }
+
+        long totalExpectedSwipes = totalMembers * totalDeckPlaces;
+        long actualSwipes = swipeRepository.countByRoomId(room.getId());
+
+        if (actualSwipes >= totalExpectedSwipes) {
+            // Mọi người đều đã hoàn thành lượt quẹt trong bộ bài
+            List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId());
+
+            Map<Place, Long> likesByPlace = allSwipes.stream()
+                    .filter(Swipe::isLiked)
+                    .collect(Collectors.groupingBy(Swipe::getPlace, Collectors.counting()));
+
+            if (likesByPlace.isEmpty()) {
+                // Không có quán nào có lượt Like > 0 -> Hòa (toàn 0 like), chờ Host tự chọn
+                return;
+            }
+
+            long maxLikes = Collections.max(likesByPlace.values());
+            if (maxLikes <= 0) {
+                return;
+            }
+
+            List<Place> topPlaces = likesByPlace.entrySet().stream()
+                    .filter(entry -> entry.getValue() == maxLikes)
+                    .map(Map.Entry::getKey)
+                    .toList();
+
+            // Nếu chỉ có DUY NHẤT 1 quán có số lượt Like cao nhất -> Tự động chốt
+            if (topPlaces.size() == 1) {
+                room.setMatchedPlace(topPlaces.get(0));
+                room.setStatus(RoomStatus.CLOSED);
+                roomRepository.save(room);
+            }
+            // Nếu topPlaces.size() > 1 (HÒA ĐIỂM) -> Không tự chốt, giữ nguyên để Host tự chọn qua API select-place
         }
     }
 

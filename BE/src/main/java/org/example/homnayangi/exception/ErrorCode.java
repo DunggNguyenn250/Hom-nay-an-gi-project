@@ -37,6 +37,8 @@ public enum ErrorCode {
     CANNOT_KICK_SELF(2010, "Trưởng phòng không thể tự xóa chính mình ra khỏi phòng", HttpStatus.BAD_REQUEST), // 🌟 Bổ sung
     ROOM_ALREADY_CLOSED(2011, "Phòng ăn đã đóng trước đó", HttpStatus.BAD_REQUEST),
     ROOM_LOCATION_NOT_SET(2012, "Phòng ăn chưa được thiết lập tọa độ vị trí", HttpStatus.BAD_REQUEST),
+    CANNOT_CHANGE_PLACE_AFTER_EXPENSE(2013, "Không thể thay đổi quán ăn vì phòng đã tạo hóa đơn chia tiền", HttpStatus.BAD_REQUEST),
+    ALREADY_SWIPED(2014, "Bạn đã quẹt địa điểm này rồi", HttpStatus.BAD_REQUEST),
 
     // === 5. LỖI TÀI CHÍNH & CHIA TIỀN (3000 - 3099) ===
     EXPENSE_NOT_FOUND(3001, "Không tìm thấy hóa đơn", HttpStatus.NOT_FOUND),

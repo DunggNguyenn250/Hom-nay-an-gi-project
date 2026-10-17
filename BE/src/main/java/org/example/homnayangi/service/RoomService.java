@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.dto.request.CreateRoomRequest;
+import org.example.homnayangi.dto.request.SelectPlaceRequest;
 import org.example.homnayangi.dto.response.PlaceResponse;
 import org.example.homnayangi.dto.response.RoomResponse;
 import org.example.homnayangi.dto.response.UserResponse;
@@ -38,6 +39,7 @@ public class RoomService {
     UserRepository userRepository;
     RoomPlaceRepository roomPlaceRepository;
     PlaceRepository placeRepository;
+    ExpenseRepository expenseRepository;
     FoursquareService foursquareService;
     UserMapper userMapper;
     RoomMapper roomMapper;
@@ -348,7 +350,7 @@ public class RoomService {
 
         // 1. Chỉ Host mới có quyền đóng phòng
         if (!room.getHost().getId().equals(currentUser.getId())) {
-            throw new AppException(ErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorCode.NOT_ROOM_HOST);
         }
 
         // 2. Kiểm tra nếu phòng đã đóng rồi thì báo lỗi
@@ -359,6 +361,41 @@ public class RoomService {
         // 3. Chuyển trạng thái phòng thành CLOSED
         room.setStatus(RoomStatus.CLOSED);
         roomRepository.save(room);
+    }
+
+    // 12. Host chủ động chọn/chốt quán ăn cho phòng (khi hòa điểm hoặc chốt sớm)
+    @Transactional
+    public RoomResponse selectPlace(UUID roomId, SelectPlaceRequest request) {
+        User currentUser = getCurrentUser();
+
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+
+        // 1. Chỉ Host mới có quyền chọn quán ăn cho phòng
+        if (!room.getHost().getId().equals(currentUser.getId())) {
+            throw new AppException(ErrorCode.NOT_ROOM_HOST);
+        }
+
+        // 2. Nếu phòng đã tạo hóa đơn chia tiền (Expense), không cho phép đổi quán nữa
+        if (expenseRepository.existsByRoomId(roomId)) {
+            throw new AppException(ErrorCode.CANNOT_CHANGE_PLACE_AFTER_EXPENSE);
+        }
+
+        // 3. Tìm quán ăn và kiểm tra xem có thuộc bộ bài (Deck) của phòng không
+        Place place = placeRepository.findById(request.getPlaceId())
+                .orElseThrow(() -> new AppException(ErrorCode.PLACE_NOT_FOUND));
+
+        boolean isPlaceInDeck = roomPlaceRepository.existsById_RoomIdAndId_PlaceId(room.getId(), place.getId());
+        if (!isPlaceInDeck) {
+            throw new AppException(ErrorCode.PLACE_NOT_IN_ROOM_DECK);
+        }
+
+        // 4. Gán quán đã chọn và đóng phiên quẹt (chuyển sang CLOSED)
+        room.setMatchedPlace(place);
+        room.setStatus(RoomStatus.CLOSED);
+        roomRepository.save(room);
+
+        return getRoomDetails(room.getId());
     }
 
     private User getCurrentUser() {

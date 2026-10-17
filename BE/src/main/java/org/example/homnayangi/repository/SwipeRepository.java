@@ -14,6 +14,12 @@ public interface SwipeRepository extends JpaRepository<Swipe, UUID> {
     // 🌟 Sửa Object -> Room và Place
     long countByRoomAndPlaceAndLiked(Room room, Place place, boolean liked);
 
+    // Đếm tổng số lượt quẹt trong 1 phòng
+    long countByRoomId(UUID roomId);
+
+    // Kiểm tra xem User đã quẹt Place này trong Room chưa
+    boolean existsByRoomIdAndUserIdAndPlaceId(UUID roomId, UUID userId, UUID placeId);
+
     // Lấy danh sách lượt quẹt của 1 User trong 1 Phòng
     List<Swipe> findAllByUserIdAndRoomId(UUID userId, UUID roomId);
 
