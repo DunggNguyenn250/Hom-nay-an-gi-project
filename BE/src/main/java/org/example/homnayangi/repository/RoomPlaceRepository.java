@@ -17,6 +17,8 @@ public interface RoomPlaceRepository extends JpaRepository<RoomPlace, RoomPlaceI
 
     List<RoomPlace> findAllById_RoomId(UUID roomId);
 
+    long countById_RoomId(UUID roomId);
+
     @Query("SELECT rp FROM RoomPlace rp JOIN FETCH rp.place WHERE rp.room.id = :roomId")
     List<RoomPlace> findAllByRoomIdWithPlace(@Param("roomId") UUID roomId);
 

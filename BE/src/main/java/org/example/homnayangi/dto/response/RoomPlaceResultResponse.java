@@ -15,4 +15,5 @@ public class RoomPlaceResultResponse {
     String placeName;
     long totalLikes;
     long totalDislikes;
+    boolean matched; // true nếu quán này đã được chốt làm quán ăn của phòng
 }

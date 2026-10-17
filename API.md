@@ -854,7 +854,10 @@ Vuốt thích hoặc không thích một địa điểm trong phòng.
 
 **Response (`result`):** `null`
 
-> **Lưu ý:** Khi tất cả thành viên trong phòng đều `liked = true` cho cùng một địa điểm, phòng tự động chuyển sang `CLOSED` và `matchedPlace` được cập nhật.
+> **Cơ chế Matching tự động:**
+> - **Luồng 1 (100% Đồng thuận tức thì):** Khi tất cả thành viên trong phòng đều bấm Like (`liked = true`) cùng một quán, hệ thống lập tức Match quán đó, gán vào `matchedPlace` và chuyển `status = CLOSED`.
+> - **Luồng 2 (Số Like cao nhất khi quẹt xong):** Khi tất cả thành viên đã quẹt xong toàn bộ bộ bài (Deck), quán có số Like cao nhất (> 0) và không bị hòa điểm sẽ tự động được chọn làm `matchedPlace` và chuyển `status = CLOSED`. Nếu kết quả bị hòa điểm (ví dụ 2 quán cùng số Like cao nhất) hoặc toàn bộ 0 Like, phòng giữ nguyên trạng thái chờ Chủ phòng (Host) tự chọn.
+> - **Ràng buộc:** Mỗi thành viên chỉ được quẹt mỗi địa điểm một lần trong phòng. Nếu quẹt lại sẽ trả về lỗi `2014` (`ALREADY_SWIPED`).
 
 ---
 
@@ -917,6 +920,34 @@ Lấy tổng hợp kết quả bình chọn/quẹt địa điểm của tất c�
 ```
 
 Dưới đây là ghi chú tài liệu API **Đóng phòng ăn (Close Room)** để bạn lưu lại và nhập vào Postman test:
+
+---
+
+### `POST /api/v1/rooms/{roomId}/select-place` 🔒
+
+Chủ phòng (Host) chủ động chọn/chốt một quán ăn cụ thể cho phòng (sử dụng khi kết quả bình chọn bị **HÒA ĐIỂM**, hoặc Host muốn chốt sớm/thay đổi quán trước khi tạo hóa đơn chia tiền).
+
+> **Ràng buộc:**
+>
+> - Chỉ **Host (Chủ phòng)** mới có quyền gọi API này (`NOT_ROOM_HOST`).
+> - Quán ăn được chọn bắt buộc phải **nằm trong bộ bài (`room_places`)** của phòng (`PLACE_NOT_IN_ROOM_DECK`).
+> - Nếu phòng **đã tạo hóa đơn chia tiền (`Expense`)** rồi thì hệ thống sẽ chặn không cho đổi quán nữa (`CANNOT_CHANGE_PLACE_AFTER_EXPENSE`).
+
+**Path Variable:**
+
+| Tên | Kiểu | Mô tả |
+| --- | ---- | ----- |
+| `roomId` | UUID | ID của phòng ăn |
+
+**Request Body:**
+
+```json
+{
+  "placeId": "7fa85f64-5717-4562-b3fc-2c963f66afa9"
+}
+```
+
+**Response thành công (`200 OK`):** `RoomResponse` đầy đủ thông tin phòng với `matchedPlace` đã được chốt và `status = "CLOSED"`.
 
 ---
 
