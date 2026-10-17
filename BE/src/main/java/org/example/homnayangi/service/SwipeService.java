@@ -106,7 +106,7 @@ public class SwipeService {
                 .toList();
     }
 
-    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng (hiển thị đầy đủ tất cả quán trong Deck hoặc lịch sử quẹt/chốt khi đã cleanup)
+    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng (chỉ tính thành viên hiện tại trong phòng)
     @Transactional(readOnly = true)
     public List<RoomPlaceResultResponse> getRoomSwipeResults(UUID roomId) {
         User currentUser = getCurrentUser();
@@ -115,12 +115,21 @@ public class SwipeService {
                 .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
         // Kiểm tra quyền thành viên trong phòng
-        RoomMemberId memberId = new RoomMemberId(roomId, currentUser.getId());
-        if (!roomMemberRepository.existsById(memberId)) {
+        RoomMemberId currentMemberId = new RoomMemberId(roomId, currentUser.getId());
+        if (!roomMemberRepository.existsById(currentMemberId)) {
             throw new AppException(ErrorCode.NOT_ROOM_MEMBER);
         }
 
-        List<Swipe> allSwipes = swipeRepository.findAllByRoomId(roomId);
+        // Lấy danh sách thành viên hiện tại để loại trừ lượt quẹt của những người đã rời/bị kick
+        List<RoomMember> currentMembers = roomMemberRepository.findAllById_RoomId(roomId);
+        Set<UUID> currentMemberIds = currentMembers.stream()
+                .map(rm -> rm.getUser().getId())
+                .collect(Collectors.toSet());
+
+        List<Swipe> allSwipes = swipeRepository.findAllByRoomId(roomId).stream()
+                .filter(s -> currentMemberIds.contains(s.getUser().getId()))
+                .toList();
+
         List<RoomPlace> deckPlaces = roomPlaceRepository.findAllByRoomIdWithPlace(roomId);
 
         Map<UUID, List<Swipe>> swipesByPlaceId = allSwipes.stream()
@@ -170,9 +179,21 @@ public class SwipeService {
             return;
         }
 
-        // 1. Luồng 1: Match tức thì khi 100% thành viên cùng bấm Like quán này
+        // Lấy danh sách ID các thành viên hiện tại trong phòng
+        Set<UUID> currentMemberIds = members.stream()
+                .map(m -> m.getUser().getId())
+                .collect(Collectors.toSet());
+
+        // Lọc toàn bộ swipe trong phòng chỉ lấy của các thành viên hiện tại (loại bỏ người đã rời phòng/bị kick)
+        List<Swipe> currentMemberSwipes = swipeRepository.findAllByRoomId(room.getId()).stream()
+                .filter(s -> currentMemberIds.contains(s.getUser().getId()))
+                .toList();
+
+        // 1. Luồng 1: Match tức thì khi 100% thành viên hiện tại cùng bấm Like quán này
         if (isLiked) {
-            long likeCount = swipeRepository.countByRoomAndPlaceAndLiked(room, place, true);
+            long likeCount = currentMemberSwipes.stream()
+                    .filter(s -> s.getPlace().getId().equals(place.getId()) && s.isLiked())
+                    .count();
             if (likeCount == totalMembers) {
                 room.setMatchedPlace(place);
                 room.setStatus(RoomStatus.CLOSED);
@@ -181,20 +202,17 @@ public class SwipeService {
             }
         }
 
-        // 2. Luồng 2: Kiểm tra khi TẤT CẢ thành viên đã quẹt xong toàn bộ bộ bài (Deck)
+        // 2. Luồng 2: Kiểm tra khi TẤT CẢ thành viên hiện tại đã quẹt xong toàn bộ bộ bài (Deck)
         long totalDeckPlaces = roomPlaceRepository.countById_RoomId(room.getId());
         if (totalDeckPlaces == 0) {
             return;
         }
 
         long totalExpectedSwipes = totalMembers * totalDeckPlaces;
-        long actualSwipes = swipeRepository.countByRoomId(room.getId());
 
-        if (actualSwipes >= totalExpectedSwipes) {
-            // Mọi người đều đã hoàn thành lượt quẹt trong bộ bài
-            List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId());
-
-            Map<Place, Long> likesByPlace = allSwipes.stream()
+        if (currentMemberSwipes.size() >= totalExpectedSwipes) {
+            // Mọi người hiện tại đều đã hoàn thành lượt quẹt trong bộ bài
+            Map<Place, Long> likesByPlace = currentMemberSwipes.stream()
                     .filter(Swipe::isLiked)
                     .collect(Collectors.groupingBy(Swipe::getPlace, Collectors.counting()));
 
