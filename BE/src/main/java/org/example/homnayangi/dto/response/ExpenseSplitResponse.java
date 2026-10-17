@@ -14,6 +14,8 @@ import java.util.UUID;
 public class ExpenseSplitResponse {
     UUID expenseId;
     UserResponse user;
+    UserResponse payer;
     BigDecimal amountOwed;
     boolean paid;
+    String qrCodeUrl;
 }

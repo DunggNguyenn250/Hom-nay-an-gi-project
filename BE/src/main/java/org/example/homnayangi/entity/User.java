@@ -38,6 +38,15 @@ public class User {
     @Column(name = "avatar_url")
     String avatarUrl;
 
+    @Column(name = "bank_bin", length = 20)
+    String bankBin;
+
+    @Column(name = "bank_account_number", length = 50)
+    String bankAccountNumber;
+
+    @Column(name = "bank_account_name", length = 100)
+    String bankAccountName;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
     @Builder.Default

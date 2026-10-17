@@ -22,5 +22,11 @@ public class UserUpdateRequest {
 
     String avatarUrl;
 
+    String bankBin;
+
+    String bankAccountNumber;
+
+    String bankAccountName;
+
     Set<String> roles;
 }

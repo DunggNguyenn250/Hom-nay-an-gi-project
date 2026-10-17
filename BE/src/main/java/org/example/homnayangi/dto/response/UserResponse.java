@@ -20,6 +20,9 @@ public class UserResponse {
     String username;
     String email;
     String avatarUrl;
+    String bankBin;
+    String bankAccountNumber;
+    String bankAccountName;
     UserStatus status;
     LocalDateTime createdAt;
     Set<Role> roles;
