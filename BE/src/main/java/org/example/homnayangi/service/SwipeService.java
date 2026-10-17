@@ -206,11 +206,14 @@ public class SwipeService {
         }
 
         long totalExpectedSwipes = totalMembers * totalDeckPlaces;
-        long actualSwipes = swipeRepository.countByRoomId(room.getId());
+        Set<UUID> memberIds = members.stream()
+                .map(member -> member.getUser().getId())
+                .collect(Collectors.toSet());
+        List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId()).stream()
+                .filter(swipe -> memberIds.contains(swipe.getUser().getId()))
+                .toList();
 
-        if (actualSwipes >= totalExpectedSwipes) {
-            // Mọi người đều đã hoàn thành lượt quẹt trong bộ bài
-            List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId());
+        if (allSwipes.size() >= totalExpectedSwipes) {
 
             Map<Place, Long> likesByPlace = allSwipes.stream()
                     .filter(Swipe::isLiked)
