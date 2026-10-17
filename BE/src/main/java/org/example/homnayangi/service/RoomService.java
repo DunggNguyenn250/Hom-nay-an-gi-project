@@ -12,13 +12,16 @@ import org.example.homnayangi.entity.*;
 import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
+import org.example.homnayangi.helper.RedisLockHelper;
 import org.example.homnayangi.mapper.PlaceMapper;
 import org.example.homnayangi.mapper.RoomMapper;
 import org.example.homnayangi.mapper.UserMapper;
 import org.example.homnayangi.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.time.LocalDateTime;
@@ -44,6 +47,8 @@ public class RoomService {
     UserMapper userMapper;
     RoomMapper roomMapper;
     PlaceMapper placeMapper;
+    RedisLockHelper redisLockHelper;
+    PlatformTransactionManager transactionManager;
 
     // 1. Tạo phòng mới
     @Transactional
@@ -339,63 +344,69 @@ public class RoomService {
     }
 
     // 11. Host chủ động đóng phòng để kết thúc phiên quẹt / chuyển sang chia tiền
-    @Transactional
     public void closeRoom(UUID roomId) {
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        redisLockHelper.executeWithRoomLock(roomId, () -> {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+                User currentUser = userRepository.findByUsername(currentUsername)
+                        .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+                Room room = roomRepository.findById(roomId)
+                        .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
-        // 1. Chỉ Host mới có quyền đóng phòng
-        if (!room.getHost().getId().equals(currentUser.getId())) {
-            throw new AppException(ErrorCode.NOT_ROOM_HOST);
-        }
+                // 1. Chỉ Host mới có quyền đóng phòng
+                if (!room.getHost().getId().equals(currentUser.getId())) {
+                    throw new AppException(ErrorCode.NOT_ROOM_HOST);
+                }
 
-        // 2. Kiểm tra nếu phòng đã đóng rồi thì báo lỗi
-        if (room.getStatus() == RoomStatus.CLOSED) {
-            throw new AppException(ErrorCode.ROOM_ALREADY_CLOSED);
-        }
+                // 2. Kiểm tra nếu phòng đã đóng rồi thì báo lỗi
+                if (room.getStatus() == RoomStatus.CLOSED) {
+                    throw new AppException(ErrorCode.ROOM_ALREADY_CLOSED);
+                }
 
-        // 3. Chuyển trạng thái phòng thành CLOSED
-        room.setStatus(RoomStatus.CLOSED);
-        roomRepository.save(room);
+                // 3. Chuyển trạng thái phòng thành CLOSED
+                room.setStatus(RoomStatus.CLOSED);
+                roomRepository.save(room);
+            });
+        });
     }
 
     // 12. Host chủ động chọn/chốt quán ăn cho phòng (khi hòa điểm hoặc chốt sớm)
-    @Transactional
     public RoomResponse selectPlace(UUID roomId, SelectPlaceRequest request) {
-        User currentUser = getCurrentUser();
+        return redisLockHelper.executeWithRoomLock(roomId, () -> {
+            return new TransactionTemplate(transactionManager).execute(status -> {
+                User currentUser = getCurrentUser();
 
-        Room room = roomRepository.findById(roomId)
-                .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
+                Room room = roomRepository.findById(roomId)
+                        .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
-        // 1. Chỉ Host mới có quyền chọn quán ăn cho phòng
-        if (!room.getHost().getId().equals(currentUser.getId())) {
-            throw new AppException(ErrorCode.NOT_ROOM_HOST);
-        }
+                // 1. Chỉ Host mới có quyền chọn quán ăn cho phòng
+                if (!room.getHost().getId().equals(currentUser.getId())) {
+                    throw new AppException(ErrorCode.NOT_ROOM_HOST);
+                }
 
-        // 2. Nếu phòng đã tạo hóa đơn chia tiền (Expense), không cho phép đổi quán nữa
-        if (expenseRepository.existsByRoomId(roomId)) {
-            throw new AppException(ErrorCode.CANNOT_CHANGE_PLACE_AFTER_EXPENSE);
-        }
+                // 2. Nếu phòng đã tạo hóa đơn chia tiền (Expense), không cho phép đổi quán nữa
+                if (expenseRepository.existsByRoomId(roomId)) {
+                    throw new AppException(ErrorCode.CANNOT_CHANGE_PLACE_AFTER_EXPENSE);
+                }
 
-        // 3. Tìm quán ăn và kiểm tra xem có thuộc bộ bài (Deck) của phòng không
-        Place place = placeRepository.findById(request.getPlaceId())
-                .orElseThrow(() -> new AppException(ErrorCode.PLACE_NOT_FOUND));
+                // 3. Tìm quán ăn và kiểm tra xem có thuộc bộ bài (Deck) của phòng không
+                Place place = placeRepository.findById(request.getPlaceId())
+                        .orElseThrow(() -> new AppException(ErrorCode.PLACE_NOT_FOUND));
 
-        boolean isPlaceInDeck = roomPlaceRepository.existsById_RoomIdAndId_PlaceId(room.getId(), place.getId());
-        if (!isPlaceInDeck) {
-            throw new AppException(ErrorCode.PLACE_NOT_IN_ROOM_DECK);
-        }
+                boolean isPlaceInDeck = roomPlaceRepository.existsById_RoomIdAndId_PlaceId(room.getId(), place.getId());
+                if (!isPlaceInDeck) {
+                    throw new AppException(ErrorCode.PLACE_NOT_IN_ROOM_DECK);
+                }
 
-        // 4. Gán quán đã chọn và đóng phiên quẹt (chuyển sang CLOSED)
-        room.setMatchedPlace(place);
-        room.setStatus(RoomStatus.CLOSED);
-        roomRepository.save(room);
+                // 4. Gán quán đã chọn và đóng phiên quẹt (chuyển sang CLOSED)
+                room.setMatchedPlace(place);
+                room.setStatus(RoomStatus.CLOSED);
+                roomRepository.save(room);
 
-        return getRoomDetails(room.getId());
+                return getRoomDetails(room.getId());
+            });
+        });
     }
 
     private User getCurrentUser() {

@@ -11,12 +11,15 @@ import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.enums.SplitType;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
+import org.example.homnayangi.helper.RedisLockHelper;
 import org.example.homnayangi.mapper.ExpenseMapper;
 import org.example.homnayangi.mapper.UserMapper;
 import org.example.homnayangi.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -36,20 +39,29 @@ public class ExpenseService {
     private final UserRepository userRepository;
     private final ExpenseMapper expenseMapper;
     private final UserMapper userMapper;
+    private final RedisLockHelper redisLockHelper;
+    private final PlatformTransactionManager transactionManager;
 
     // =========================================================================
     // 1. TẠO HÓA ĐƠN
     // =========================================================================
 
     /**
-     * Tạo hóa đơn mới cho phòng đã CLOSED.
+     * Tạo hóa đơn mới cho phòng đã CLOSED (được bảo vệ bởi Distributed Lock trên roomId).
      * Tự động tính toán và lưu ExpenseSplit theo kiểu chia được chọn.
      *
      * @param request Thông tin hóa đơn cần tạo
      * @return ExpenseResponse đầy đủ
      */
-    @Transactional
     public ExpenseResponse createExpense(ExpenseCreateRequest request) {
+        return redisLockHelper.executeWithRoomLock(request.getRoomId(), () -> {
+            return new TransactionTemplate(transactionManager).execute(status -> {
+                return createExpenseInternal(request);
+            });
+        });
+    }
+
+    private ExpenseResponse createExpenseInternal(ExpenseCreateRequest request) {
         // 1. Kiểm tra phòng
         Room room = roomRepository.findById(request.getRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
@@ -64,7 +76,7 @@ public class ExpenseService {
 
         // 2. Kiểm tra Payer (Người trả tiền)
         User payer = userRepository.findById(request.getPayerId())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED)); // Dùng USER_NOT_EXISTED
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         Set<UUID> memberIds = roomMemberRepository.findAllByRoomId(room.getId())
                 .stream()
@@ -95,7 +107,7 @@ public class ExpenseService {
                 .splits(new ArrayList<>())
                 .build();
 
-// 5. Thêm các món ăn vào items
+        // 5. Thêm các món ăn vào items
         for (ExpenseItemRequest itemReq : request.getItems()) {
             List<UUID> sharerIds = (itemReq.getSharerIds() == null || itemReq.getSharerIds().isEmpty())
                     ? new ArrayList<>(memberIds)
@@ -116,7 +128,6 @@ public class ExpenseService {
 
             for (UUID sharerId : sharerIds) {
                 User sharerUser = userRepository.getReferenceById(sharerId);
-
 
                 ItemSharerId sharerEmbeddedId = new ItemSharerId();
                 sharerEmbeddedId.setUserId(sharerId);
@@ -142,6 +153,7 @@ public class ExpenseService {
 
         return expenseMapper.toExpenseResponse(savedExpense);
     }
+
     // =========================================================================
     // 2. XEM HÓA ĐƠN
     // =========================================================================
@@ -320,9 +332,6 @@ public class ExpenseService {
     // PRIVATE HELPERS
     // =========================================================================
 
-    // =========================================================================
-    // HELPER: Hàm tính toán danh sách ExpenseSplit dựa trên SplitType
-    // =========================================================================
     private List<ExpenseSplit> calculateSplits(Expense expense, Set<UUID> memberIds) {
         Map<UUID, BigDecimal> splitAmounts;
 
@@ -373,62 +382,6 @@ public class ExpenseService {
         expenseRepository.save(expense);
     }
 
-    /**
-     * Lưu các ExpenseItem và ItemSharer vào database.
-     */
-    private List<ExpenseItem> saveExpenseItems(
-            Expense expense,
-            List<ExpenseItemRequest> itemRequests,
-            Set<UUID> memberIds) {
-
-        List<ExpenseItem> savedItems = new ArrayList<>();
-
-        for (ExpenseItemRequest itemReq : itemRequests) {
-            // 1. Xác định danh sách sharers
-            List<UUID> sharerIds = (itemReq.getSharerIds() == null || itemReq.getSharerIds().isEmpty())
-                    ? new ArrayList<>(memberIds)
-                    : itemReq.getSharerIds();
-
-            for (UUID sharerId : sharerIds) {
-                if (!memberIds.contains(sharerId)) {
-                    throw new AppException(ErrorCode.SHARER_NOT_IN_ROOM);
-                }
-            }
-
-            // 2. Tạo và lưu ExpenseItem
-            ExpenseItem item = ExpenseItem.builder()
-                    .expense(expense)
-                    .itemName(itemReq.getItemName())
-                    .price(itemReq.getPrice())
-                    .build();
-            ExpenseItem savedItem = expenseItemRepository.save(item);
-
-            // 3. Tạo danh sách ItemSharer
-            List<ItemSharer> sharers = new ArrayList<>();
-            for (UUID sharerId : sharerIds) {
-                User sharerUser = userRepository.getReferenceById(sharerId);
-                ItemSharer sharer = ItemSharer.builder()
-                        .id(new ItemSharerId(savedItem.getId(), sharerId))
-                        .expenseItem(savedItem)
-                        .user(sharerUser)
-                        .build();
-                sharers.add(sharer);
-            }
-
-            // SỬA TẠI ĐÂY: Hứng lại danh sách đã được Persistence Context Quản lý (Managed)
-            List<ItemSharer> savedSharers = itemSharerRepository.saveAll(sharers);
-
-            savedItem.setSharers(savedSharers);
-            savedItems.add(savedItem);
-        }
-
-        return savedItems;
-    }
-
-    /**
-     * Tính toán chia đều: tổng hóa đơn / số thành viên.
-     * Phần dư (do làm tròn) được cộng vào người đầu tiên trong danh sách.
-     */
     private Map<UUID, BigDecimal> calculateEvenSplit(BigDecimal totalAmount, Set<UUID> memberIds) {
         int memberCount = memberIds.size();
         BigDecimal baseAmount = totalAmount.divide(
@@ -442,7 +395,6 @@ public class ExpenseService {
 
         for (UUID memberId : memberIds) {
             if (!firstAdded) {
-                // Người đầu tiên chịu phần dư
                 splitMap.put(memberId, baseAmount.add(remainder));
                 firstAdded = true;
             } else {
@@ -453,16 +405,11 @@ public class ExpenseService {
         return splitMap;
     }
 
-    /**
-     * Tính toán chia theo món: cộng dồn phần tiền từ mỗi món mà người đó chia sẻ.
-     * Các thành viên không tham gia bất kỳ món nào vẫn có split = 0 (ghi lại để theo dõi).
-     */
     private Map<UUID, BigDecimal> calculateByItemSplit(
             List<ExpenseItem> items,
             Set<UUID> allMemberIds) {
 
         Map<UUID, BigDecimal> splitMap = new HashMap<>();
-        // Khởi tạo 0 cho tất cả thành viên
         allMemberIds.forEach(id -> splitMap.put(id, BigDecimal.ZERO));
 
         for (ExpenseItem item : items) {
@@ -479,30 +426,5 @@ public class ExpenseService {
         }
 
         return splitMap;
-    }
-
-    /**
-     * Lưu danh sách ExpenseSplit vào database.
-     */
-    private void saveSplits(Expense expense, Map<UUID, BigDecimal> splitAmounts, Set<UUID> memberIds) {
-        List<ExpenseSplit> splits = new ArrayList<>();
-
-        for (Map.Entry<UUID, BigDecimal> entry : splitAmounts.entrySet()) {
-            UUID userId = entry.getKey();
-            BigDecimal amount = entry.getValue();
-
-            User member = userRepository.getReferenceById(userId);
-
-            ExpenseSplit split = ExpenseSplit.builder()
-                    .id(new ExpenseSplitId(expense.getId(), userId))
-                    .expense(expense)
-                    .user(member)
-                    .amountOwed(amount)
-                    .paid(false)
-                    .build();
-            splits.add(split);
-        }
-
-        expenseSplitRepository.saveAll(splits);
     }
 }

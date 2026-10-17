@@ -10,16 +10,15 @@ import org.example.homnayangi.entity.*;
 import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
+import org.example.homnayangi.helper.RedisLockHelper;
 import org.example.homnayangi.mapper.SwipeMapper;
 import org.example.homnayangi.repository.*;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,35 +34,11 @@ public class SwipeService {
     RoomMemberRepository roomMemberRepository;
     RoomPlaceRepository roomPlaceRepository;
     SwipeMapper swipeMapper;
-    RedisTemplate<String, Object> redisTemplate;
+    RedisLockHelper redisLockHelper;
     PlatformTransactionManager transactionManager;
 
     public void swipe(SwipeRequest request) {
-        String lockKey = "lock:room:" + request.getRoomId();
-        String lockValue = UUID.randomUUID().toString();
-        boolean acquired = false;
-        int retries = 5;
-
-        while (retries > 0) {
-            Boolean success = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, Duration.ofSeconds(5));
-            if (Boolean.TRUE.equals(success)) {
-                acquired = true;
-                break;
-            }
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new RuntimeException("Thread interrupted while waiting for lock", e);
-            }
-            retries--;
-        }
-
-        if (!acquired) {
-            throw new AppException(ErrorCode.ROOM_BUSY);
-        }
-
-        try {
+        redisLockHelper.executeWithRoomLock(request.getRoomId(), () -> {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 User user = getCurrentUser();
 
@@ -105,12 +80,7 @@ public class SwipeService {
 
                 checkForMatch(room, place, request.isLiked());
             });
-        } finally {
-            Object currentLockValue = redisTemplate.opsForValue().get(lockKey);
-            if (lockValue.equals(currentLockValue)) {
-                redisTemplate.delete(lockKey);
-            }
-        }
+        });
     }
 
     // 🌟 API 1: Lấy danh sách lượt quẹt cá nhân trong phòng
@@ -182,6 +152,11 @@ public class SwipeService {
     }
 
     private void checkForMatch(Room room, Place place, boolean isLiked) {
+        // Nếu phòng không còn ở trạng thái SWIPING (đã được Host đóng hoặc chốt trước đó), không ghi đè
+        if (room.getStatus() != RoomStatus.SWIPING) {
+            return;
+        }
+
         List<RoomMember> members = roomMemberRepository.findAllById_RoomId(room.getId());
         long totalMembers = members.size();
         if (totalMembers == 0) {
@@ -206,14 +181,11 @@ public class SwipeService {
         }
 
         long totalExpectedSwipes = totalMembers * totalDeckPlaces;
-        Set<UUID> memberIds = members.stream()
-                .map(member -> member.getUser().getId())
-                .collect(Collectors.toSet());
-        List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId()).stream()
-                .filter(swipe -> memberIds.contains(swipe.getUser().getId()))
-                .toList();
+        long actualSwipes = swipeRepository.countByRoomId(room.getId());
 
-        if (allSwipes.size() >= totalExpectedSwipes) {
+        if (actualSwipes >= totalExpectedSwipes) {
+            // Mọi người đều đã hoàn thành lượt quẹt trong bộ bài
+            List<Swipe> allSwipes = swipeRepository.findAllByRoomId(room.getId());
 
             Map<Place, Long> likesByPlace = allSwipes.stream()
                     .filter(Swipe::isLiked)
