@@ -106,7 +106,7 @@ public class SwipeService {
                 .toList();
     }
 
-    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng (hiển thị đầy đủ tất cả quán trong Deck kèm cờ matched)
+    // 🌟 API 2: Thống kê kết quả quẹt của cả phòng (hiển thị đầy đủ tất cả quán trong Deck hoặc lịch sử quẹt/chốt khi đã cleanup)
     @Transactional(readOnly = true)
     public List<RoomPlaceResultResponse> getRoomSwipeResults(UUID roomId) {
         User currentUser = getCurrentUser();
@@ -129,8 +129,15 @@ public class SwipeService {
         List<RoomPlaceResultResponse> results = new ArrayList<>();
         UUID matchedPlaceId = (room.getMatchedPlace() != null) ? room.getMatchedPlace().getId() : null;
 
-        for (RoomPlace rp : deckPlaces) {
-            Place place = rp.getPlace();
+        // Tập hợp các quán: từ bộ bài hiện tại (deckPlaces), các quán đã được quẹt (allSwipes), và quán đã chốt (matchedPlace)
+        Map<UUID, Place> resultPlaces = new LinkedHashMap<>();
+        deckPlaces.forEach(rp -> resultPlaces.put(rp.getPlace().getId(), rp.getPlace()));
+        allSwipes.forEach(swipe -> resultPlaces.putIfAbsent(swipe.getPlace().getId(), swipe.getPlace()));
+        if (matchedPlaceId != null) {
+            resultPlaces.putIfAbsent(matchedPlaceId, room.getMatchedPlace());
+        }
+
+        for (Place place : resultPlaces.values()) {
             List<Swipe> placeSwipes = swipesByPlaceId.getOrDefault(place.getId(), Collections.emptyList());
             long totalLikes = placeSwipes.stream().filter(Swipe::isLiked).count();
             long totalDislikes = placeSwipes.size() - totalLikes;
