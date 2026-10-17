@@ -62,8 +62,8 @@ public class ExpenseService {
     }
 
     private ExpenseResponse createExpenseInternal(ExpenseCreateRequest request) {
-        // 1. Kiểm tra phòng
-        Room room = roomRepository.findById(request.getRoomId())
+        // 1. Kiểm tra phòng (Dùng row lock PESSIMISTIC_WRITE để chống race condition)
+        Room room = roomRepository.findByIdForUpdate(request.getRoomId())
                 .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
         if (room.getStatus() != RoomStatus.CLOSED) {

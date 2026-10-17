@@ -351,7 +351,7 @@ public class RoomService {
                 User currentUser = userRepository.findByUsername(currentUsername)
                         .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-                Room room = roomRepository.findById(roomId)
+                Room room = roomRepository.findByIdForUpdate(roomId)
                         .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
                 // 1. Chỉ Host mới có quyền đóng phòng
@@ -377,7 +377,7 @@ public class RoomService {
             return new TransactionTemplate(transactionManager).execute(status -> {
                 User currentUser = getCurrentUser();
 
-                Room room = roomRepository.findById(roomId)
+                Room room = roomRepository.findByIdForUpdate(roomId)
                         .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
                 // 1. Chỉ Host mới có quyền chọn quán ăn cho phòng

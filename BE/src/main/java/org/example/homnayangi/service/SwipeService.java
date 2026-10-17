@@ -42,7 +42,7 @@ public class SwipeService {
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
                 User user = getCurrentUser();
 
-                Room room = roomRepository.findById(request.getRoomId())
+                Room room = roomRepository.findByIdForUpdate(request.getRoomId())
                         .orElseThrow(() -> new AppException(ErrorCode.ROOM_NOT_FOUND));
 
                 if (room.getStatus() != RoomStatus.SWIPING) {
