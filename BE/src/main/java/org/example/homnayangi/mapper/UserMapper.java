@@ -16,6 +16,9 @@ public interface UserMapper {
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "roles", ignore = true)
+    @Mapping(target = "bankBin", ignore = true)
+    @Mapping(target = "bankAccountNumber", ignore = true)
+    @Mapping(target = "bankAccountName", ignore = true)
     User toUser(UserCreationRequest request);
 
     UserResponse toUserResponse(User user);

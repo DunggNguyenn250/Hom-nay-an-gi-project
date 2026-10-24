@@ -12,6 +12,7 @@ import org.example.homnayangi.enums.SplitType;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
 import org.example.homnayangi.helper.RedisLockHelper;
+import org.example.homnayangi.helper.VietQRHelper;
 import org.example.homnayangi.mapper.ExpenseMapper;
 import org.example.homnayangi.mapper.UserMapper;
 import org.example.homnayangi.repository.*;
@@ -40,6 +41,7 @@ public class ExpenseService {
     private final ExpenseMapper expenseMapper;
     private final UserMapper userMapper;
     private final RedisLockHelper redisLockHelper;
+    private final VietQRHelper vietQRHelper;
     private final PlatformTransactionManager transactionManager;
 
     // =========================================================================
@@ -51,7 +53,7 @@ public class ExpenseService {
      * Tự động tính toán và lưu ExpenseSplit theo kiểu chia được chọn.
      *
      * @param request Thông tin hóa đơn cần tạo
-     * @return ExpenseResponse đầy đủ
+     * @return ExpenseResponse đầy đủ kèm mã VietQR
      */
     public ExpenseResponse createExpense(ExpenseCreateRequest request) {
         return redisLockHelper.executeWithRoomLock(request.getRoomId(), () -> {
@@ -151,7 +153,7 @@ public class ExpenseService {
         // 7. Lưu Expense (CascadeType.ALL tự động lưu toàn bộ items, sharers và splits)
         Expense savedExpense = expenseRepository.save(expense);
 
-        return expenseMapper.toExpenseResponse(savedExpense);
+        return toEnrichedExpenseResponse(savedExpense);
     }
 
     // =========================================================================
@@ -159,7 +161,7 @@ public class ExpenseService {
     // =========================================================================
 
     /**
-     * Lấy chi tiết một hóa đơn theo ID.
+     * Lấy chi tiết một hóa đơn theo ID kèm mã VietQR cho các khoản chưa trả.
      */
     @Transactional(readOnly = true)
     public ExpenseResponse getExpenseById(UUID expenseId) {
@@ -169,7 +171,7 @@ public class ExpenseService {
         List<ExpenseItem> itemsWithSharers = expenseItemRepository.findAllByExpenseIdWithSharers(expenseId);
         expense.setItems(itemsWithSharers);
 
-        return expenseMapper.toExpenseResponse(expense);
+        return toEnrichedExpenseResponse(expense);
     }
 
     /**
@@ -185,13 +187,13 @@ public class ExpenseService {
                 .map(expense -> {
                     List<ExpenseItem> items = expenseItemRepository.findAllByExpenseIdWithSharers(expense.getId());
                     expense.setItems(items);
-                    return expenseMapper.toExpenseResponse(expense);
+                    return toEnrichedExpenseResponse(expense);
                 })
                 .collect(Collectors.toList());
     }
 
     /**
-     * Lấy tất cả các khoản nợ chưa thanh toán của người dùng hiện tại.
+     * Lấy tất cả các khoản nợ chưa thanh toán của người dùng hiện tại kèm mã VietQR chuyển khoản.
      */
     @Transactional(readOnly = true)
     public List<ExpenseSplitResponse> getMyUnpaidSplits() {
@@ -200,12 +202,29 @@ public class ExpenseService {
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         return expenseSplitRepository.findUnpaidSplitsByUserId(currentUser.getId()).stream()
-                .map(split -> ExpenseSplitResponse.builder()
-                        .expenseId(split.getId().getExpenseId())
-                        .user(userMapper.toUserResponse(split.getUser()))
-                        .amountOwed(split.getAmountOwed())
-                        .paid(split.isPaid())
-                        .build())
+                .map(split -> {
+                    User payer = split.getExpense().getPayer();
+                    String roomCode = (split.getExpense().getRoom() != null && split.getExpense().getRoom().getRoomCode() != null)
+                            ? split.getExpense().getRoom().getRoomCode()
+                            : "";
+                    String memo = "Tra tien an phong " + roomCode;
+                    String qrUrl = (payer != null) ? vietQRHelper.generateQrUrl(
+                            payer.getBankBin(),
+                            payer.getBankAccountNumber(),
+                            payer.getBankAccountName(),
+                            split.getAmountOwed(),
+                            memo
+                    ) : null;
+
+                    return ExpenseSplitResponse.builder()
+                            .expenseId(split.getId().getExpenseId())
+                            .user(userMapper.toUserResponse(split.getUser()))
+                            .payer(payer != null ? userMapper.toUserResponse(payer) : null)
+                            .amountOwed(split.getAmountOwed())
+                            .paid(split.isPaid())
+                            .qrCodeUrl(qrUrl)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
@@ -264,8 +283,10 @@ public class ExpenseService {
         return ExpenseSplitResponse.builder()
                 .expenseId(expenseId)
                 .user(userMapper.toUserResponse(debtor))
+                .payer(userMapper.toUserResponse(expense.getPayer()))
                 .amountOwed(split.getAmountOwed())
                 .paid(true)
+                .qrCodeUrl(null)
                 .build();
     }
 
@@ -297,7 +318,7 @@ public class ExpenseService {
 
         // 4. Lưu và trả về DTO
         Expense savedExpense = expenseRepository.save(expense);
-        return expenseMapper.toExpenseResponse(savedExpense);
+        return toEnrichedExpenseResponse(savedExpense);
     }
 
     // =========================================================================
@@ -331,6 +352,30 @@ public class ExpenseService {
     // =========================================================================
     // PRIVATE HELPERS
     // =========================================================================
+
+    private ExpenseResponse toEnrichedExpenseResponse(Expense expense) {
+        ExpenseResponse response = expenseMapper.toExpenseResponse(expense);
+        if (response.getSplits() != null && expense.getPayer() != null) {
+            User payer = expense.getPayer();
+            String roomCode = (expense.getRoom() != null && expense.getRoom().getRoomCode() != null)
+                    ? expense.getRoom().getRoomCode()
+                    : "";
+
+            for (ExpenseSplitResponse splitResp : response.getSplits()) {
+                if (!splitResp.isPaid() && !splitResp.getUser().getId().equals(payer.getId())) {
+                    String memo = "Tra tien an phong " + roomCode;
+                    splitResp.setQrCodeUrl(vietQRHelper.generateQrUrl(
+                            payer.getBankBin(),
+                            payer.getBankAccountNumber(),
+                            payer.getBankAccountName(),
+                            splitResp.getAmountOwed(),
+                            memo
+                    ));
+                }
+            }
+        }
+        return response;
+    }
 
     private List<ExpenseSplit> calculateSplits(Expense expense, Set<UUID> memberIds) {
         Map<UUID, BigDecimal> splitAmounts;

@@ -14,8 +14,10 @@ public interface ExpenseMapper {
 
     @Mapping(target = "expenseId", source = "id.expenseId")
     @Mapping(target = "user", source = "user")
+    @Mapping(target = "payer", source = "expense.payer")
     @Mapping(target = "amountOwed", source = "amountOwed")
     @Mapping(target = "paid", source = "paid")
+    @Mapping(target = "qrCodeUrl", ignore = true)
     ExpenseSplitResponse toExpenseSplitResponse(ExpenseSplit split);
 
     @Mapping(target = "id", source = "id")
