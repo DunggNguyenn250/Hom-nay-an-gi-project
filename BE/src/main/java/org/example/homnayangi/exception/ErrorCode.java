@@ -17,6 +17,7 @@ public enum ErrorCode {
     LOGIN_FAILED(1006, "Tài khoản hoặc mật khẩu không chính xác", HttpStatus.UNAUTHORIZED),
     CANNOT_DELETE_ADMIN(1007, "Không thể xóa tài khoản Admin hệ thống", HttpStatus.BAD_REQUEST),
     CANNOT_ASSIGN_ADMIN_ROLE(1008, "Không được phép tạo hoặc phân quyền Admin cho tài khoản khác", HttpStatus.BAD_REQUEST),
+    INVALID_OTP(1009, "Mã OTP không hợp lệ hoặc đã hết hạn", HttpStatus.BAD_REQUEST),
 
     // === 3. LỖI VALIDATION DỮ LIỆU ĐẦU VÀO (1100 - 1199) ===
     USERNAME_INVALID(1101, "Tên đăng nhập phải có ít nhất 3 ký tự", HttpStatus.BAD_REQUEST),

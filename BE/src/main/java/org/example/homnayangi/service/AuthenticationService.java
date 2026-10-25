@@ -11,10 +11,10 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 
-import org.example.homnayangi.dto.request.AuthenticationRequest;
-import org.example.homnayangi.dto.request.IntrospectRequest;
+import org.example.homnayangi.dto.request.*;
 import org.example.homnayangi.dto.response.AuthenticationResponse;
 import org.example.homnayangi.dto.response.IntrospectResponse;
+import org.example.homnayangi.dto.response.VerifyOtpResponse;
 import org.example.homnayangi.entity.User;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
@@ -38,10 +38,56 @@ import java.util.StringJoiner;
 public class AuthenticationService {
     UserRepository userRepository;
 
+    EmailService emailService;
+
+    PasswordEncoder passwordEncoder;
+
     @NonFinal
     // mã bí mật của hệ thống
     @Value("${jwt.signerKey}")
     protected String SIGNER_KEY;
+
+    // 1. Gửi OTP về Email
+    public void sendOtp(SendOtpRequest request) {
+        userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        String otp = emailService.generateAndSaveOtp(request.getEmail());
+        emailService.sendOtpEmail(request.getEmail(), otp);
+    }
+
+    // 2. Kiểm tra OTP
+    public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
+        boolean isValid = emailService.validateOtp(request.getEmail(), request.getOtp());
+        if (!isValid) {
+            throw new AppException(ErrorCode.INVALID_OTP);
+        }
+        return VerifyOtpResponse.builder()
+                .verified(true)
+                .build();
+    }
+
+    // 3. Yêu cầu Quên Mật Khẩu
+    public void forgotPassword(SendOtpRequest request) {
+        sendOtp(request); // Tái sử dụng luồng gửi OTP
+    }
+
+    // 4. Đặt lại Mật Khẩu Mới
+    public void resetPassword(ResetPasswordRequest request) {
+        boolean isValidOtp = emailService.validateOtp(request.getEmail(), request.getOtp());
+        if (!isValidOtp) {
+            throw new AppException(ErrorCode.INVALID_OTP);
+        }
+
+        var user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // Xóa OTP sau khi đổi mật khẩu thành công
+        emailService.deleteOtp(request.getEmail());
+    }
 
     // Xác thực token
     // Mỗi khi client gọi api khác thì không cần phải gửi lại mật khẩu nữa

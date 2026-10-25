@@ -16,4 +16,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT DISTINCT u FROM User u WHERE u.username = :username")
     Optional<User> findByUsername(@Param("username") String username);
+
+    // Bổ sung phương thức này
+    Optional<User> findByEmail(String email);
 }
