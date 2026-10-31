@@ -57,6 +57,8 @@ graphify-out/
 # AI Tools & Personal Notes
 # ==========================================
 .claude
+**/.claude
 .obsidian
+**/.obsidian
 graphify-out
 .agents
