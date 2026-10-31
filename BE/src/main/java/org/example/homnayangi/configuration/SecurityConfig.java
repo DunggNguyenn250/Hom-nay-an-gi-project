@@ -32,7 +32,11 @@ public class SecurityConfig {
     private final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/users",
             "/api/v1/auth/token",
-            "/api/v1/auth/introspect"
+            "/api/v1/auth/introspect",
+            "/api/v1/auth/send-otp",
+            "/api/v1/auth/verify-otp",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password"
     };
 
     private final String[] SWAGGER_ENDPOINTS = {

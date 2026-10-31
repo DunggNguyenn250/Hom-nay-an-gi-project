@@ -52,3 +52,11 @@ yarn-error.log*
 .env.*.local
 graphify-out/
 .agents/
+
+# ==========================================
+# AI Tools & Personal Notes
+# ==========================================
+.claude
+.obsidian
+graphify-out
+.agents
