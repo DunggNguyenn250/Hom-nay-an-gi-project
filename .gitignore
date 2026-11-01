@@ -62,3 +62,8 @@ graphify-out/
 **/.obsidian
 graphify-out
 .agents
+
+# Docker Configs
+Dockerfile
+docker-compose.yml
+.dockerignore
