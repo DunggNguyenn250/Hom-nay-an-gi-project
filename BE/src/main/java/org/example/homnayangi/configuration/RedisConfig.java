@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
@@ -25,16 +26,19 @@ import java.time.Duration;
 @Slf4j
 @Configuration
 @EnableCaching
-public class RedisConfig {
+public class RedisConfig implements CachingConfigurer {
 
     private ObjectMapper createRedisObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
-
-        // Hỗ trợ serialize/deserialize các kiểu dữ liệu thời gian (LocalDateTime, LocalDate,...)
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // KHÔNG gọi activateDefaultTyping ở đây để tránh xung đột với GenericJackson2JsonRedisSerializer
+        objectMapper.activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+        );
+
         return objectMapper;
     }
 
@@ -70,8 +74,7 @@ public class RedisConfig {
                 .build();
     }
 
-    // 🌟 CƠ CHẾ CHỊU LỖI (FAULT-TOLERANT) CHO CACHE KHI REDIS SẬP HOẶC MẤT KẾT NỐI
-    @Bean
+    @Override
     public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override
@@ -95,5 +98,4 @@ public class RedisConfig {
             }
         };
     }
-
 }

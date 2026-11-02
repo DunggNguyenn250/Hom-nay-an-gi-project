@@ -74,8 +74,10 @@ public class PlaceService {
                 .toList();
     }
 
-    @Cacheable(value = "places_nearby", key = "{#latitude, #longitude, #radius, #category}")
-    public List<PlaceResponse> getNearbyPlaces(double latitude, double longitude, double radius, String category) {
+    @Cacheable(
+            value = "places_nearby",
+            key = "#latitude + '_' + #longitude + '_' + #radius + '_' + (#category != null ? #category : 'ALL')"
+    )    public List<PlaceResponse> getNearbyPlaces(double latitude, double longitude, double radius, String category) {
         List<Place> places;
         if (category != null && !category.trim().isEmpty()) {
             places = placeRepository.findNearbyPlacesByCategory(latitude, longitude, radius, category);
