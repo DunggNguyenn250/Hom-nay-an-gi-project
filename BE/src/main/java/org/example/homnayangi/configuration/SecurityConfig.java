@@ -108,6 +108,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/places/**").hasRole("ADMIN")
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
                         .requestMatchers("/api/v1/swipes/**").authenticated()

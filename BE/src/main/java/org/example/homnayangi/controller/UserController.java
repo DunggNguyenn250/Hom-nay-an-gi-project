@@ -32,11 +32,11 @@ public class UserController {
     }
 
     @GetMapping
-    public ApiResponse<List<UserResponse>> getUsers() {
+    public ApiResponse<List<UserResponse>> getUsers(@RequestParam(required = false) String name) {
         return ApiResponse.<List<UserResponse>>builder()
                 .code(1000)
                 .message("Lấy danh sách người dùng thành công")
-                .result(userService.getUsers())
+                .result(userService.getUsers(name)) // Truyền name vào service
                 .build();
     }
 

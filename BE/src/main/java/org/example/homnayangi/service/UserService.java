@@ -51,8 +51,17 @@ public class UserService {
         return userMapper.toUserResponse(userRepository.save(user));
     }
 
-    public List<UserResponse> getUsers() {
-        return userRepository.findAll().stream()
+    public List<UserResponse> getUsers(String name) {
+        List<User> users;
+
+        // Nếu có truyền tên lên thì tìm kiếm, ngược lại lấy tất cả
+        if (name != null && !name.trim().isEmpty()) {
+            users = userRepository.findByUsernameContainingIgnoreCase(name);
+        } else {
+            users = userRepository.findAll();
+        }
+
+        return users.stream()
                 .map(userMapper::toUserResponse)
                 .toList();
     }
