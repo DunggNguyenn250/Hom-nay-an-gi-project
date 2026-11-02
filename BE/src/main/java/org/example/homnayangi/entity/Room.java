@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.enums.RoomStatus;
+import org.example.homnayangi.enums.RoomType;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -39,6 +40,15 @@ public class Room {
     @Column(name = "status", length = 20)
     @Builder.Default
     RoomStatus status = RoomStatus.OPEN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "room_type", length = 20)
+    @Builder.Default
+    RoomType roomType = RoomType.PRIVATE;
+
+    @Column(name = "max_members")
+    @Builder.Default
+    Integer maxMembers = 4;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "matched_place_id")

@@ -3,6 +3,7 @@ package org.example.homnayangi.dto.request;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.example.homnayangi.enums.RoomType;
 
 import java.math.BigDecimal;
 
@@ -30,4 +31,10 @@ public class CreateRoomRequest {
     @Min(value = 3, message = "Số lượng quán phải từ 3 trở lên")
     @Max(value = 50, message = "Số lượng quán không được vượt quá 50")
     Integer deckSize;
+
+    @Min(value = 2, message = "Số lượng thành viên tối thiểu là 2")
+    @Max(value = 20, message = "Số lượng thành viên tối đa không vượt quá 20")
+    Integer maxMembers;
+
+    RoomType roomType;
 }

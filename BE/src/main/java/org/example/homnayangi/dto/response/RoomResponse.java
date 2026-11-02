@@ -3,6 +3,7 @@ package org.example.homnayangi.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.example.homnayangi.enums.RoomStatus;
+import org.example.homnayangi.enums.RoomType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,6 +21,9 @@ public class RoomResponse {
     String roomCode;
     UserResponse host;
     RoomStatus status;
+    RoomType roomType;
+    Integer maxMembers;
+    Integer currentMembers;
     PlaceResponse matchedPlace;
     BigDecimal latitude;
     BigDecimal longitude;
