@@ -26,10 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.apache.commons.lang3.RandomStringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -203,12 +200,31 @@ public class RoomService {
         RoomMember member = roomMemberRepository.findById(memberId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
 
-        if (room.getHost().getId().equals(currentUser.getId())) {
-            room.setStatus(RoomStatus.CLOSED);
-            roomRepository.save(room);
+        // 1. Xóa thành viên này ra khỏi phòng và flush ngay xuống Database
+        roomMemberRepository.delete(member);
+        roomMemberRepository.flush();
+
+        // 2. Lấy danh sách các thành viên còn lại trong phòng
+        List<RoomMember> remainingMembers = roomMemberRepository.findAllByRoomId(roomId);
+
+        // KỊCH BẢN 1: Nếu phòng không còn ai (ví dụ Host đi một mình rời phòng) -> Xóa phòng hoàn toàn
+        if (remainingMembers.isEmpty()) {
+            roomPlaceRepository.deleteAllById_RoomId(roomId);
+            roomRepository.delete(room);
+            return;
         }
 
-        roomMemberRepository.delete(member);
+        // KỊCH BẢN 2: Người rời là Chủ phòng (Host) nhưng trong phòng vẫn còn thành viên khác
+        // -> Tự động chuyển quyền Host cho người vào phòng sớm nhất tiếp theo
+        if (room.getHost().getId().equals(currentUser.getId())) {
+            remainingMembers.sort(Comparator.comparing(
+                    RoomMember::getJoinedAt,
+                    Comparator.nullsLast(Comparator.naturalOrder())
+            ));
+            User newHost = remainingMembers.get(0).getUser();
+            room.setHost(newHost);
+            roomRepository.save(room);
+        }
     }
 
     // 7. Host xóa (kick) thành viên ra khỏi phòng
