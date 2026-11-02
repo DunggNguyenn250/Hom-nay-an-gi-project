@@ -63,6 +63,7 @@ jobs:
       - name: Cập nhật và khởi chạy lại Backend Container
         run: |
           cd /home/dungnb/project_HNAJ
+          git pull origin main
           docker compose pull backend
           docker compose up -d --force-recreate backend
           docker exec hnaj-redis redis-cli FLUSHALL
