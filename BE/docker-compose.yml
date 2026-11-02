@@ -1,0 +1,135 @@
+version: '3.9'
+
+networks:
+  hnaj-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+services:
+
+  # ==========================================
+  # 1. PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: hnaj-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: homnayangi_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "123456"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - hnaj-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d homnayangi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ==========================================
+  # 2. Redis Cache
+  # ==========================================
+  redis:
+    image: redis:alpine
+    container_name: hnaj-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ""
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - hnaj-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ==========================================
+  # 3. Backend - Spring Boot
+  # ==========================================
+  backend:
+    build:
+      context: ./BE
+      dockerfile: Dockerfile
+    container_name: hnaj-backend
+    restart: unless-stopped
+    environment:
+      # Server
+      SERVER_PORT: 8080
+      # DataSource - PostgreSQL
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/homnayangi_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: "123456"
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      # JPA / Hibernate
+      SPRING_JPA_HIBERNATE_NAMING_PHYSICAL_STRATEGY: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_SHOW_SQL: "true"
+      # Flyway
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "0"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_SSL_ENABLED: "false"
+      # Mail
+      SPRING_MAIL_HOST: smtp.gmail.com
+      SPRING_MAIL_PORT: 587
+      MAIL_USERNAME: nguyenbadung2005@gmail.com
+      MAIL_PASSWORD: "rttq khhy vbib skku"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      # Swagger / SpringDoc
+      SPRINGDOC_API_DOCS_PATH: /v3/api-docs
+      SPRINGDOC_SWAGGER_UI_PATH: /swagger-ui.html
+      SPRINGDOC_SWAGGER_UI_ENABLED: "true"
+      SWAGGER_AUTO_OPEN: "true"
+      # Room cleanup
+      ROOM_RETENTION_DAYS: 7
+      ROOM_CLEANUP_CRON: "0 0 2 * * ?"
+      # External APIs
+      FOURSQUARE_API_KEY: 2FVLAOS5ANHEQQO25XGEUR5BYU1NJZ33X3AOEM0ENGL0CHAY
+      # JWT
+      JWT_SIGNER_KEY: 1fe0e06cec44773a2028d3da798ec971e8692051321a0d57c0da5c17d71af3a9
+    ports:
+      - "8080:8080"
+    networks:
+      - hnaj-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ==========================================
+  # 4. Frontend - ReactJS + Nginx
+  # ==========================================
+  frontend:
+    build:
+      context: ./FE
+      dockerfile: Dockerfile
+    container_name: hnaj-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    networks:
+      - hnaj-network
+    depends_on:
+      - backend

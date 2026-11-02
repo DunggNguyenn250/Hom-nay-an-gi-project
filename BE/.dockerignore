@@ -1,0 +1,9 @@
+target/
+.git/
+.gitignore
+.gitattributes
+.idea/
+.obsidian/
+.mvn/wrapper/maven-wrapper.jar
+*.md
+*.iml
