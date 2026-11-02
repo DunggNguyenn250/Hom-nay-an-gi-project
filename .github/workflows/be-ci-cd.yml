@@ -57,18 +57,13 @@ jobs:
   # 🌟 BỔ SUNG JOB TỰ ĐỘNG DEPLOY TRÊN MÁY ẢO UBUNTU
   deploy:
     needs: push-docker-image
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-    steps:
-      - name: SSH vào máy ảo Ubuntu để cập nhật Backend
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}
-          script: |
-            cd /home/dungnb/project_HNAJ
-            docker compose pull backend
-            docker compose up -d --force-recreate backend
-            docker exec hnaj-redis redis-cli FLUSHALL
+  steps:
+    - name: Cập nhật và khởi chạy lại Backend Container
+      run: |
+        cd /home/dungnb/project_HNAJ
+        docker compose pull backend
+        docker compose up -d --force-recreate backend
+        docker exec hnaj-redis redis-cli FLUSHALL
