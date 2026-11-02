@@ -48,6 +48,10 @@ public class SecurityConfig {
             "/webjars/**"
     };
 
+    private final String[] WS_ENDPOINTS = {
+            "/ws/**"
+    };
+
     @Value("${jwt.signerKey}")
     private String signerKey;
 
@@ -66,85 +70,49 @@ public class SecurityConfig {
                 .build();
     }
 
-    // =========================================================================
-    // 1. CẤU HÌNH CORS CHO PHÉP FRONTEND REACT GỌI API
-    // =========================================================================
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Thêm các domain/port của Frontend cho phép truy cập:
-        // - http://localhost:3000: Cổng mặc định của Create React App / Next.js
-        // - http://localhost:5173: Cổng mặc định của Vite React
+
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://localhost:5174"
         ));
 
-        // Cho phép tất cả các HTTP Method cần thiết
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        // Cho phép tất cả các Headers (bao gồm Content-Type, Authorization, v.v.)
         configuration.setAllowedHeaders(List.of("*"));
-
-        // Cho phép truyền Credential (Cookie, Bearer Token)
         configuration.setAllowCredentials(true);
-
-        // Thời gian cache cấu hình CORS preflight request (3600 giây = 1 tiếng)
         configuration.setMaxAge(3600L);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Áp dụng cấu hình CORS cho tất cả các endpoint trong hệ thống
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 
-    // =========================================================================
-    // 2. CẤU HÌNH SECURITY FILTER CHAIN
-    // =========================================================================
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
-                // Bật CORS (Spring Security sẽ tự động nhặt Bean corsConfigurationSource ở trên)
                 .cors(Customizer.withDefaults())
-
                 .authorizeHttpRequests(request -> request
-                        // 1. Swagger UI (Public)
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
 
-                        // 2. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
+                        .requestMatchers(WS_ENDPOINTS).permitAll()
+
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
-
-                        // 3. User cá nhân
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
-
-                        // 4. Tags
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
-
-                        // 5. Swipes
                         .requestMatchers("/api/v1/swipes/**").authenticated()
-
-                        // 6. Friendships
                         .requestMatchers("/api/v1/friendships/**").authenticated()
-
-                        // 7. Rooms
                         .requestMatchers("/api/v1/rooms/**").authenticated()
-
-                        // 8. Expenses (Hóa đơn & Chia tiền)
                         .requestMatchers("/api/v1/expenses/**").authenticated()
-
-                        // 9. Matchmaking (Ghép phòng tự động & Phòng công khai)
                         .requestMatchers("/api/v1/matchmaking/**").authenticated()
-
-                        // 10. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
-
                         .anyRequest().authenticated()
                 );
-
-        // Cấu hình OAuth2 Resource Server cho JWT
         httpSecurity.oauth2ResourceServer(oauth2 ->
                 oauth2.jwt(jwtConfigurer -> jwtConfigurer
                                 .decoder(jwtDecoder())
@@ -153,8 +121,6 @@ public class SecurityConfig {
                         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
                         .accessDeniedHandler(new JwtAccessDeniedHandler())
         );
-
-        // Tắt CSRF vì ứng dụng sử dụng JWT Token (Stateless)
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
         return httpSecurity.build();
@@ -164,7 +130,6 @@ public class SecurityConfig {
     @Bean
     JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        // Để chuỗi rỗng "" vì trong Token đã lưu sẵn "ROLE_ADMIN", "ROLE_USER"
         jwtGrantedAuthoritiesConverter.setAuthorityPrefix("");
 
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();

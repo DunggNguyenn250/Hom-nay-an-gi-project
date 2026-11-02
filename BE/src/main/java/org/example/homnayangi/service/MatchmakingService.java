@@ -45,8 +45,8 @@ public class MatchmakingService {
     static final String RESULT_PREFIX = "matchmaking:result:";
     static final String LOCK_KEY = "lock:matchmaking";
 
-    static final Duration TICKET_TTL = Duration.ofMinutes(3);
-    static final Duration RESULT_TTL = Duration.ofMinutes(10);
+    static final Duration TICKET_TTL = Duration.ofMinutes(3);  // Chờ tối đa 3 phút
+    static final Duration RESULT_TTL = Duration.ofMinutes(10); // Giữ kết quả ghép 10 phút
 
     StringRedisTemplate redisTemplate;
     ObjectMapper objectMapper;
@@ -56,7 +56,7 @@ public class MatchmakingService {
     RoomService roomService;
     UserMapper userMapper;
     PlatformTransactionManager transactionManager;
-
+    SocketService socketService;
 
     public MatchmakingStatusResponse findOrQueueMatch(MatchmakingRequest request) {
         User currentUser = getCurrentUser();
@@ -86,6 +86,9 @@ public class MatchmakingService {
 
             saveMatchResult(currentUserId, matchedResponse);
             removeTicket(currentUserId);
+
+            socketService.sendMatchmakingSuccess(currentUserId, matchedResponse);
+
             return matchedResponse;
         }
 
@@ -175,7 +178,6 @@ public class MatchmakingService {
                 })
                 .toList();
     }
-
 
     private Room findSuitablePublicRoom(User currentUser, double userLat, double userLon, double userRadius) {
         List<Room> publicRooms = roomRepository.findByStatusAndRoomType(RoomStatus.OPEN, RoomType.PUBLIC);
@@ -350,6 +352,8 @@ public class MatchmakingService {
         for (MatchTicket ticket : group) {
             removeTicket(ticket.getUserId());
             saveMatchResult(ticket.getUserId(), resultResponse);
+
+            socketService.sendMatchmakingSuccess(ticket.getUserId(), resultResponse);
         }
 
         log.info("Ghép nhóm thành công {} người vào phòng {}", group.size(), newRoom.getRoomCode());

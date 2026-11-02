@@ -11,6 +11,7 @@ import org.example.homnayangi.enums.RoomStatus;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
 import org.example.homnayangi.helper.RedisLockHelper;
+import org.example.homnayangi.mapper.PlaceMapper;
 import org.example.homnayangi.mapper.SwipeMapper;
 import org.example.homnayangi.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,8 +35,10 @@ public class SwipeService {
     RoomMemberRepository roomMemberRepository;
     RoomPlaceRepository roomPlaceRepository;
     SwipeMapper swipeMapper;
+    PlaceMapper placeMapper;
     RedisLockHelper redisLockHelper;
     PlatformTransactionManager transactionManager;
+    SocketService socketService;
 
     public void swipe(SwipeRequest request) {
         redisLockHelper.executeWithRoomLock(request.getRoomId(), () -> {
@@ -77,7 +80,7 @@ public class SwipeService {
                         .build();
 
                 swipeRepository.save(swipe);
-
+                socketService.sendSwipeAction(room.getId(), user.getId(), user.getUsername(), request.isLiked());
                 checkForMatch(room, place, request.isLiked());
             });
         });
@@ -198,6 +201,9 @@ public class SwipeService {
                 room.setMatchedPlace(place);
                 room.setStatus(RoomStatus.CLOSED);
                 roomRepository.save(room);
+
+                // 🌟 BẮN WEBSOCKET 2: Đồng thuận tuyệt đối (100% like) -> Nổ pháo hoa MATCH_FOUND
+                socketService.sendMatchFound(room.getId(), placeMapper.toPlaceResponse(place));
                 return;
             }
         }
@@ -233,9 +239,13 @@ public class SwipeService {
 
             // Nếu chỉ có DUY NHẤT 1 quán có số lượt Like cao nhất -> Tự động chốt
             if (topPlaces.size() == 1) {
-                room.setMatchedPlace(topPlaces.get(0));
+                Place winningPlace = topPlaces.get(0);
+                room.setMatchedPlace(winningPlace);
                 room.setStatus(RoomStatus.CLOSED);
                 roomRepository.save(room);
+
+                // 🌟 BẮN WEBSOCKET 3: Quẹt xong cả bộ bài và tìm ra quán thắng điểm -> MATCH_FOUND
+                socketService.sendMatchFound(room.getId(), placeMapper.toPlaceResponse(winningPlace));
             }
             // Nếu topPlaces.size() > 1 (HÒA ĐIỂM) -> Không tự chốt, giữ nguyên để Host tự chọn qua API select-place
         }

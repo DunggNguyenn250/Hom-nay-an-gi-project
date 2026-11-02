@@ -47,6 +47,7 @@ public class RoomService {
     PlaceMapper placeMapper;
     RedisLockHelper redisLockHelper;
     PlatformTransactionManager transactionManager;
+    SocketService socketService;
 
     // 1. Tạo phòng mới
     @Transactional
@@ -114,7 +115,9 @@ public class RoomService {
 
         roomMemberRepository.save(newMember);
 
-        return getRoomDetails(room.getId()); // Trả về RoomResponse đầy đủ thông tin thành viên
+        RoomResponse details = getRoomDetails(room.getId());
+        socketService.sendMemberJoined(room.getId(), userMapper.toUserResponse(user), details.getCurrentMembers());
+        return details;
     }
 
     // 3. Lấy danh sách phòng của tôi (Không cần danh sách thành viên chi tiết)
@@ -186,6 +189,9 @@ public class RoomService {
 
         room.setStatus(RoomStatus.SWIPING);
         roomRepository.save(room);
+
+        // 🌟 BẮN WEBSOCKET: Báo cho toàn bộ thành viên trong phòng chuyển trang sang bàn quẹt thẻ
+        socketService.sendGameStarted(roomId);
     }
 
     // 6. Thành viên tự rời khỏi phòng
@@ -211,11 +217,14 @@ public class RoomService {
         if (remainingMembers.isEmpty()) {
             roomPlaceRepository.deleteAllById_RoomId(roomId);
             roomRepository.delete(room);
+            // Báo phòng đã đóng/xóa
+            socketService.sendRoomClosed(roomId);
             return;
         }
 
         // KỊCH BẢN 2: Người rời là Chủ phòng (Host) nhưng trong phòng vẫn còn thành viên khác
         // -> Tự động chuyển quyền Host cho người vào phòng sớm nhất tiếp theo
+        UUID newHostId = null;
         if (room.getHost().getId().equals(currentUser.getId())) {
             remainingMembers.sort(Comparator.comparing(
                     RoomMember::getJoinedAt,
@@ -224,7 +233,11 @@ public class RoomService {
             User newHost = remainingMembers.get(0).getUser();
             room.setHost(newHost);
             roomRepository.save(room);
+            newHostId = newHost.getId();
         }
+
+        // 🌟 BẮN WEBSOCKET: Báo cho những người còn lại biết ai vừa rời phòng và Host mới là ai
+        socketService.sendMemberLeft(roomId, userMapper.toUserResponse(currentUser), remainingMembers.size(), newHostId);
     }
 
     // 7. Host xóa (kick) thành viên ra khỏi phòng
@@ -247,7 +260,14 @@ public class RoomService {
         RoomMember member = roomMemberRepository.findById(memberId)
                 .orElseThrow(() -> new AppException(ErrorCode.NOT_ROOM_MEMBER));
 
+        User kickedUser = member.getUser();
         roomMemberRepository.delete(member);
+        roomMemberRepository.flush();
+
+        List<RoomMember> remainingMembers = roomMemberRepository.findAllByRoomId(roomId);
+
+        // 🌟 BẮN WEBSOCKET: Báo thành viên bị kick ra khỏi phòng
+        socketService.sendMemberLeft(roomId, userMapper.toUserResponse(kickedUser), remainingMembers.size(), null);
     }
 
     // 8. Host xóa hoàn toàn phòng ăn
@@ -263,6 +283,9 @@ public class RoomService {
         if (!room.getHost().getId().equals(currentUser.getId())) {
             throw new AppException(ErrorCode.NOT_ROOM_HOST);
         }
+
+        // 🌟 BẮN WEBSOCKET: Báo phòng đã bị xóa trước khi xóa dữ liệu
+        socketService.sendRoomClosed(roomId);
 
         // 3. Xóa các bản ghi liên quan trong phòng trước (tránh lỗi Foreign Key)
         roomPlaceRepository.deleteAllById_RoomId(roomId);
@@ -397,6 +420,9 @@ public class RoomService {
                 // 3. Chuyển trạng thái phòng thành CLOSED
                 room.setStatus(RoomStatus.CLOSED);
                 roomRepository.save(room);
+
+                // 🌟 BẮN WEBSOCKET: Báo phòng đã được Host đóng
+                socketService.sendRoomClosed(roomId);
             });
         });
     }
@@ -433,6 +459,9 @@ public class RoomService {
                 room.setMatchedPlace(place);
                 room.setStatus(RoomStatus.CLOSED);
                 roomRepository.save(room);
+
+                // 🌟 BẮN WEBSOCKET: Báo quán đã được chốt (MATCH_FOUND)
+                socketService.sendMatchFound(room.getId(), placeMapper.toPlaceResponse(place));
 
                 return getRoomDetails(room.getId());
             });
