@@ -98,10 +98,15 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(request -> request
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
-
                         .requestMatchers(WS_ENDPOINTS).permitAll()
-
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
+
+                        // THÊM ĐOẠN NÀY ĐỂ MỞ QUYỀN CHO PLACES (GET cho phép xem, POST/PUT/DELETE yêu cầu ADMIN)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/places", "/api/v1/places/**").permitAll() // Hoặc .authenticated() nếu cần đăng nhập
+                        .requestMatchers(HttpMethod.POST, "/api/v1/places/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/places/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/places/**").hasRole("ADMIN")
+
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
@@ -110,6 +115,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/rooms/**").authenticated()
                         .requestMatchers("/api/v1/expenses/**").authenticated()
                         .requestMatchers("/api/v1/matchmaking/**").authenticated()
+
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 );
