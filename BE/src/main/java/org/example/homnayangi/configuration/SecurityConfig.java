@@ -135,7 +135,10 @@ public class SecurityConfig {
                         // 8. Expenses (Hóa đơn & Chia tiền)
                         .requestMatchers("/api/v1/expenses/**").authenticated()
 
-                        // 9. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
+                        // 9. Matchmaking (Ghép phòng tự động & Phòng công khai)
+                        .requestMatchers("/api/v1/matchmaking/**").authenticated()
+
+                        // 10. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
