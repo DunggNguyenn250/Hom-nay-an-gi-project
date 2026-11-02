@@ -49,6 +49,15 @@ public class UserController {
                 .build();
     }
 
+    @PutMapping("/me")
+    public ApiResponse<UserResponse> updateMyInfo(@RequestBody @Valid UserUpdateRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .code(1000)
+                .message("Cập nhật thông tin tài khoản thành công")
+                .result(userService.updateMyInfo(request))
+                .build();
+    }
+
     @GetMapping("/{userId}")
     public ApiResponse<UserResponse> getUser(@PathVariable UUID userId) {
         return ApiResponse.<UserResponse>builder()
