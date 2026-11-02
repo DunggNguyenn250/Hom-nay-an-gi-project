@@ -2,6 +2,9 @@ package org.example.homnayangi.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import jakarta.annotation.PostConstruct;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -45,25 +48,31 @@ public class MatchmakingService {
     static final String RESULT_PREFIX = "matchmaking:result:";
     static final String LOCK_KEY = "lock:matchmaking";
 
-    static final Duration TICKET_TTL = Duration.ofMinutes(3);  // Chờ tối đa 3 phút
-    static final Duration RESULT_TTL = Duration.ofMinutes(10); // Giữ kết quả ghép 10 phút
+    static final Duration TICKET_TTL = Duration.ofMinutes(3);
+    static final Duration RESULT_TTL = Duration.ofMinutes(10);
 
-    StringRedisTemplate redisTemplate;
-    ObjectMapper objectMapper;
-    RoomRepository roomRepository;
-    RoomMemberRepository roomMemberRepository;
-    UserRepository userRepository;
-    RoomService roomService;
-    UserMapper userMapper;
-    PlatformTransactionManager transactionManager;
-    SocketService socketService;
+    final StringRedisTemplate redisTemplate;
+    final ObjectMapper objectMapper;
+    final RoomRepository roomRepository;
+    final RoomMemberRepository roomMemberRepository;
+    final UserRepository userRepository;
+    final RoomService roomService;
+    final UserMapper userMapper;
+    final PlatformTransactionManager transactionManager;
+    final SocketService socketService;
+
+    @PostConstruct
+    public void init() {
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
 
     public MatchmakingStatusResponse findOrQueueMatch(MatchmakingRequest request) {
         User currentUser = getCurrentUser();
         UUID currentUserId = currentUser.getId();
 
-        double userLat = request.getLatitude().doubleValue();
-        double userLon = request.getLongitude().doubleValue();
+        double userLat = request.getLatitude() != null ? request.getLatitude().doubleValue() : 21.0;
+        double userLon = request.getLongitude() != null ? request.getLongitude().doubleValue() : 105.0;
         double userRadius = (request.getRadius() != null && request.getRadius() > 0) ? request.getRadius() : 5.0;
         int targetSize = (request.getTargetGroupSize() != null && request.getTargetGroupSize() >= 2)
                 ? request.getTargetGroupSize()
@@ -96,29 +105,37 @@ public class MatchmakingService {
     }
 
     public MatchmakingStatusResponse getMatchStatus() {
-        User currentUser = getCurrentUser();
-        UUID currentUserId = currentUser.getId();
+        try {
+            User currentUser = getCurrentUser();
+            UUID currentUserId = currentUser.getId();
 
-        MatchmakingStatusResponse cachedResult = getMatchResult(currentUserId);
-        if (cachedResult != null) {
-            return cachedResult;
-        }
+            MatchmakingStatusResponse cachedResult = getMatchResult(currentUserId);
+            if (cachedResult != null) {
+                return cachedResult;
+            }
 
-        MatchTicket ticket = getTicket(currentUserId);
-        if (ticket != null) {
-            Long queueSize = redisTemplate.opsForSet().size(QUEUE_KEY);
+            MatchTicket ticket = getTicket(currentUserId);
+            if (ticket != null) {
+                Long queueSize = redisTemplate.opsForSet().size(QUEUE_KEY);
+                return MatchmakingStatusResponse.builder()
+                        .status(MatchStatus.WAITING)
+                        .message("Đang tìm người ăn cùng trong bán kính " + ticket.getRadius() + " km...")
+                        .targetGroupSize(ticket.getTargetGroupSize())
+                        .currentQueueSize(queueSize != null ? queueSize.intValue() : 1)
+                        .build();
+            }
+
             return MatchmakingStatusResponse.builder()
-                    .status(MatchStatus.WAITING)
-                    .message("Đang tìm người ăn cùng trong bán kính " + ticket.getRadius() + " km...")
-                    .targetGroupSize(ticket.getTargetGroupSize())
-                    .currentQueueSize(queueSize != null ? queueSize.intValue() : 1)
+                    .status(MatchStatus.TIMEOUT)
+                    .message("Không tìm thấy hàng đợi active của bạn. Bạn có thể bắt đầu tìm kiếm mới.")
+                    .build();
+        } catch (Exception e) {
+            log.error("Lỗi khi kiểm tra trạng thái ghép phòng: {}", e.getMessage(), e);
+            return MatchmakingStatusResponse.builder()
+                    .status(MatchStatus.TIMEOUT)
+                    .message("Không thể lấy trạng thái hàng đợi lúc này.")
                     .build();
         }
-
-        return MatchmakingStatusResponse.builder()
-                .status(MatchStatus.TIMEOUT)
-                .message("Không tìm thấy ai quanh khu vực của bạn trong thời gian chờ. Bạn có thể thử lại với bán kính lớn hơn.")
-                .build();
     }
 
     public void cancelMatch() {
@@ -130,18 +147,22 @@ public class MatchmakingService {
         log.info("Người dùng {} đã hủy tìm kiếm ghép phòng", currentUser.getUsername());
     }
 
-    public List<PublicRoomResponse> getNearbyPublicRooms(double userLat, double userLon, Double radius) {
+    public List<PublicRoomResponse> getNearbyPublicRooms(Double userLat, Double userLon, Double radius) {
+        double lat = userLat != null ? userLat : 21.0;
+        double lon = userLon != null ? userLon : 105.0;
         double maxRadius = (radius != null && radius > 0) ? radius : 5.0;
-        User currentUser = getCurrentUser();
 
         List<Room> publicRooms = roomRepository.findByStatusAndRoomType(RoomStatus.OPEN, RoomType.PUBLIC);
+        if (publicRooms == null || publicRooms.isEmpty()) {
+            return Collections.emptyList();
+        }
 
         return publicRooms.stream()
-                .filter(room -> room.getLatitude() != null && room.getLongitude() != null)
+                .filter(room -> room != null && room.getLatitude() != null && room.getLongitude() != null)
                 .map(room -> {
                     double dist = GeoUtils.calculateDistance(
-                            userLat,
-                            userLon,
+                            lat,
+                            lon,
                             room.getLatitude().doubleValue(),
                             room.getLongitude().doubleValue()
                     );
@@ -162,15 +183,17 @@ public class MatchmakingService {
                     double dist = (double) arr[1];
                     int currentMembers = (int) arr[2];
 
+                    UserResponse hostResponse = room.getHost() != null ? userMapper.toUserResponse(room.getHost()) : null;
+
                     return PublicRoomResponse.builder()
                             .roomId(room.getId())
                             .name(room.getName())
                             .roomCode(room.getRoomCode())
-                            .host(userMapper.toUserResponse(room.getHost()))
+                            .host(hostResponse)
                             .latitude(room.getLatitude())
                             .longitude(room.getLongitude())
                             .radius(room.getRadius())
-                            .distance(Math.round(dist * 100.0) / 100.0) // làm tròn 2 chữ số thập phân
+                            .distance(Math.round(dist * 100.0) / 100.0) // Sửa phép nhân * 100.0
                             .currentMembers(currentMembers)
                             .maxMembers(room.getMaxMembers())
                             .createdAt(room.getCreatedAt())
@@ -181,9 +204,10 @@ public class MatchmakingService {
 
     private Room findSuitablePublicRoom(User currentUser, double userLat, double userLon, double userRadius) {
         List<Room> publicRooms = roomRepository.findByStatusAndRoomType(RoomStatus.OPEN, RoomType.PUBLIC);
+        if (publicRooms == null) return null;
 
         return publicRooms.stream()
-                .filter(room -> room.getLatitude() != null && room.getLongitude() != null)
+                .filter(room -> room != null && room.getLatitude() != null && room.getLongitude() != null)
                 .filter(room -> !roomMemberRepository.existsById(new RoomMemberId(room.getId(), currentUser.getId())))
                 .map(room -> {
                     double distance = GeoUtils.calculateDistance(
@@ -284,7 +308,7 @@ public class MatchmakingService {
     }
 
     private MatchmakingStatusResponse createMatchedRoomForGroup(List<MatchTicket> group, User creator) {
-        double avgLat = group.stream().mapToDouble(MatchTicket::getLatitude).average().orElse(creator.getId() != null ? 21.0 : 0);
+        double avgLat = group.stream().mapToDouble(MatchTicket::getLatitude).average().orElse(21.0);
         double avgLon = group.stream().mapToDouble(MatchTicket::getLongitude).average().orElse(105.0);
         double avgRadius = group.stream().mapToDouble(MatchTicket::getRadius).average().orElse(5.0);
 

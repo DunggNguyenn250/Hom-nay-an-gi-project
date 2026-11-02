@@ -53,8 +53,8 @@ public class MatchmakingController {
 
     @GetMapping("/public-rooms")
     public ApiResponse<List<PublicRoomResponse>> getNearbyPublicRooms(
-            @RequestParam double latitude,
-            @RequestParam double longitude,
+            @RequestParam(required = false, defaultValue = "21.0") Double latitude,
+            @RequestParam(required = false, defaultValue = "105.0") Double longitude,
             @RequestParam(required = false, defaultValue = "5.0") Double radius
     ) {
         List<PublicRoomResponse> responseList = matchmakingService.getNearbyPublicRooms(latitude, longitude, radius);
