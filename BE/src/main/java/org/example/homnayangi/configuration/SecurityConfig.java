@@ -48,6 +48,10 @@ public class SecurityConfig {
             "/webjars/**"
     };
 
+    private final String[] WS_ENDPOINTS = {
+            "/ws/**"
+    };
+
     @Value("${jwt.signerKey}")
     private String signerKey;
 
@@ -67,7 +71,7 @@ public class SecurityConfig {
     }
 
     // =========================================================================
-    // 1. CẤU HÌNH CORS CHO PHÉP FRONTEND REACT GỌI API
+    // 1. CẤU HÌNH CORS CHO PHÉP FRONTEND REACT GỌI API & WEBSOCKET
     // =========================================================================
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -113,32 +117,35 @@ public class SecurityConfig {
                         // 1. Swagger UI (Public)
                         .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
 
-                        // 2. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
+                        // 2. WebSocket Handshake (Public cho bước thiết lập bắt tay ban đầu của SockJS/STOMP)
+                        .requestMatchers(WS_ENDPOINTS).permitAll()
+
+                        // 3. Public Endpoints (Chỉ cho phép POST đăng ký / đăng nhập)
                         .requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS).permitAll()
 
-                        // 3. User cá nhân
+                        // 4. User cá nhân
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/me").authenticated()
 
-                        // 4. Tags
+                        // 5. Tags
                         .requestMatchers(HttpMethod.GET, "/api/v1/tags", "/api/v1/tags/{id}").authenticated()
                         .requestMatchers("/api/v1/tags/user/me/**").authenticated()
 
-                        // 5. Swipes
+                        // 6. Swipes
                         .requestMatchers("/api/v1/swipes/**").authenticated()
 
-                        // 6. Friendships
+                        // 7. Friendships
                         .requestMatchers("/api/v1/friendships/**").authenticated()
 
-                        // 7. Rooms
+                        // 8. Rooms
                         .requestMatchers("/api/v1/rooms/**").authenticated()
 
-                        // 8. Expenses (Hóa đơn & Chia tiền)
+                        // 9. Expenses (Hóa đơn & Chia tiền)
                         .requestMatchers("/api/v1/expenses/**").authenticated()
 
-                        // 9. Matchmaking (Ghép phòng tự động & Phòng công khai)
+                        // 10. Matchmaking (Ghép phòng tự động & Phòng công khai)
                         .requestMatchers("/api/v1/matchmaking/**").authenticated()
 
-                        // 10. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
+                        // 11. Tất cả các endpoint /api/v1/** còn lại dành riêng cho ADMIN
                         .requestMatchers("/api/v1/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
