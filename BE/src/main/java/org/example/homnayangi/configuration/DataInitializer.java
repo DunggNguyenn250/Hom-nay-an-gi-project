@@ -5,24 +5,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.example.homnayangi.constant.PredefinedTags;
-import org.example.homnayangi.entity.Place;
-import org.example.homnayangi.entity.Tag;
-import org.example.homnayangi.entity.User;
-import org.example.homnayangi.enums.Role;
-import org.example.homnayangi.enums.UserStatus;
-import org.example.homnayangi.repository.PlaceRepository;
-import org.example.homnayangi.repository.TagRepository;
-import org.example.homnayangi.repository.UserRepository;
+import org.example.homnayangi.entity.*;
+import org.example.homnayangi.enums.*;
+import org.example.homnayangi.repository.*;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 @Configuration
 @RequiredArgsConstructor
@@ -30,91 +22,79 @@ import java.util.Set;
 @Slf4j
 public class DataInitializer {
 
-    PasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final TagRepository tagRepository;
+    private final PlaceRepository placeRepository;
+    private final FriendshipRepository friendshipRepository;
+    private final RoomRepository roomRepository;
+    private final ExpenseRepository expenseRepository;
 
     @Bean
-    ApplicationRunner initDatabase(
-            UserRepository userRepository,
-            TagRepository tagRepository,
-            PlaceRepository placeRepository) {
+    ApplicationRunner initDatabase() {
         return args -> {
-            initUsers(userRepository);
-            initPredefinedTags(tagRepository);
-            initPlaces(placeRepository);
+            initUsers();
+            initPredefinedTags();
+            initPlaces();
+            initFriendships();
+            initRooms();
+            initExpenses();
         };
     }
 
-    private void initUsers(UserRepository userRepository) {
-        // 1. Tạo tài khoản admin mặc định (nếu chưa có)
+    private void initUsers() {
         if (!userRepository.existsByUsername("admin")) {
-            Set<Role> adminRoles = new HashSet<>();
-            adminRoles.add(Role.ROLE_ADMIN);
-
             User admin = User.builder()
                     .username("admin")
                     .email("admin@homnayangi.com")
                     .passwordHash(passwordEncoder.encode("admin"))
                     .status(UserStatus.ACTIVE)
-                    .roles(adminRoles)
+                    .roles(Set.of(Role.ROLE_ADMIN))
                     .build();
-
             userRepository.save(admin);
             log.warn("Tài khoản 'admin' đã được tạo với mật khẩu: 'admin'");
         }
 
-        // 2. Danh sách 5 thành viên mẫu theo yêu cầu
         record SampleUserData(String username, String email, String password, Role role) {}
 
         List<SampleUserData> sampleUsers = List.of(
-                new SampleUserData("tiendat", "tiendat@homnayangi.com", "123456", Role.ROLE_USER),       // Đỗ Tiến Đạt
-                new SampleUserData("ducanh", "ducanh@homnayangi.com", "123456", Role.ROLE_USER),         // Vũ Đức Anh
-                new SampleUserData("trunghieu", "trunghieu@homnayangi.com", "123456", Role.ROLE_USER),   // Nguyễn Trung Hiếu
-                new SampleUserData("badung", "badung@homnayangi.com", "123456", Role.ROLE_USER),         // Nguyễn Bá Dũng
-                new SampleUserData("lanhuong", "lanhuong@homnayangi.com", "123456", Role.ROLE_USER)      // Phùng Thị Lan Hương
+                new SampleUserData("tiendat", "tiendat@homnayangi.com", "123456", Role.ROLE_USER),
+                new SampleUserData("ducanh", "ducanh@homnayangi.com", "123456", Role.ROLE_USER),
+                new SampleUserData("trunghieu", "trunghieu@homnayangi.com", "123456", Role.ROLE_USER),
+                new SampleUserData("badung", "badung@homnayangi.com", "123456", Role.ROLE_USER),
+                new SampleUserData("lanhuong", "lanhuong@homnayangi.com", "123456", Role.ROLE_USER)
         );
 
         for (SampleUserData data : sampleUsers) {
             if (!userRepository.existsByUsername(data.username())) {
-                Set<Role> roles = new HashSet<>();
-                roles.add(data.role());
-
                 User user = User.builder()
                         .username(data.username())
                         .email(data.email())
                         .passwordHash(passwordEncoder.encode(data.password()))
                         .status(UserStatus.ACTIVE)
-                        .roles(roles)
+                        .roles(Set.of(data.role()))
                         .build();
-
                 userRepository.save(user);
                 log.info("Đã khởi tạo tài khoản mẫu: {} ({})", data.username(), data.email());
             }
         }
     }
 
-    private void initPredefinedTags(TagRepository tagRepository) {
+    private void initPredefinedTags() {
         List<Tag> newTags = new ArrayList<>();
         for (String tagName : PredefinedTags.ALL_TAGS) {
             if (!tagRepository.existsByTagName(tagName)) {
                 newTags.add(Tag.builder().tagName(tagName).build());
             }
         }
-
         if (!newTags.isEmpty()) {
             tagRepository.saveAll(newTags);
-            log.info("Đã khởi tạo thành công {} tags mẫu vào cơ sở dữ liệu.", newTags.size());
+            log.info("Đã khởi tạo thành công {} tags mẫu.", newTags.size());
         }
     }
 
-    private void initPlaces(PlaceRepository placeRepository) {
-        record SamplePlaceData(
-                String name,
-                String category,
-                Integer priceRange,
-                String address,
-                BigDecimal latitude,
-                BigDecimal longitude
-        ) {}
+    private void initPlaces() {
+        record SamplePlaceData(String name, String category, Integer priceRange, String address, BigDecimal latitude, BigDecimal longitude) {}
 
         List<SamplePlaceData> samplePlaces = List.of(
                 new SamplePlaceData("Bún Đậu Mắm Tôm Gốc Đa", "Bún/Phở", 1, "Số 15 Triều Khúc, Thanh Xuân, Hà Nội", new BigDecimal("20.985123"), new BigDecimal("105.797541")),
@@ -132,22 +112,90 @@ public class DataInitializer {
         List<Place> newPlaces = new ArrayList<>();
         for (SamplePlaceData data : samplePlaces) {
             if (!placeRepository.existsByName(data.name())) {
-                Place place = Place.builder()
+                newPlaces.add(Place.builder()
                         .name(data.name())
                         .category(data.category())
                         .priceRange(data.priceRange())
                         .address(data.address())
                         .latitude(data.latitude())
                         .longitude(data.longitude())
-                        .imageUrl(null) // Để null theo yêu cầu
-                        .build();
-                newPlaces.add(place);
+                        .imageUrl(null)
+                        .build());
             }
         }
-
         if (!newPlaces.isEmpty()) {
             placeRepository.saveAll(newPlaces);
-            log.info("Đã khởi tạo thành công {} quán ăn/địa điểm mẫu vào cơ sở dữ liệu.", newPlaces.size());
+            log.info("Đã khởi tạo thành công {} địa điểm mẫu.", newPlaces.size());
+        }
+    }
+
+    private void initFriendships() {
+        if (friendshipRepository.count() == 0) {
+            Optional<User> badungOpt = userRepository.findByUsername("badung");
+            Optional<User> tiendatOpt = userRepository.findByUsername("tiendat");
+            Optional<User> ducanhOpt = userRepository.findByUsername("ducanh");
+
+            if (badungOpt.isPresent() && tiendatOpt.isPresent() && ducanhOpt.isPresent()) {
+                User badung = badungOpt.get();
+                User tiendat = tiendatOpt.get();
+                User ducanh = ducanhOpt.get();
+
+                // Bạn bè đã chấp nhận (badung & tiendat)
+                Friendship f1 = Friendship.builder()
+                        .id(new FriendshipId(badung.getId(), tiendat.getId()))
+                        .requester(badung)
+                        .addressee(tiendat)
+                        .status(FriendshipStatus.ACCEPTED)
+                        .build();
+
+                // Lời mời kết bạn đang chờ (ducanh gửi cho badung)
+                Friendship f2 = Friendship.builder()
+                        .id(new FriendshipId(ducanh.getId(), badung.getId()))
+                        .requester(ducanh)
+                        .addressee(badung)
+                        .status(FriendshipStatus.PENDING)
+                        .build();
+
+                friendshipRepository.saveAll(List.of(f1, f2));
+                log.info("Đã khởi tạo thành công dữ liệu bạn bè mẫu (ACCEPTED và PENDING).");
+            }
+        }
+    }
+
+    // 🌟 2. Khởi tạo phòng test mẫu (Sửa .name và RoomStatus.OPEN)
+    private void initRooms() {
+        if (roomRepository.count() == 0) {
+            Optional<User> badungOpt = userRepository.findByUsername("badung");
+            if (badungOpt.isPresent()) {
+                Room room = Room.builder()
+                        .roomCode("TEST68")
+                        .name("Phòng Ăn Trưa Triều Khúc")
+                        .host(badungOpt.get())
+                        .status(RoomStatus.OPEN)
+                        .build();
+
+                roomRepository.save(room);
+                log.info("Đã khởi tạo phòng test mẫu với mã phòng: TEST68");
+            }
+        }
+    }
+
+    // 🌟 3. Khởi tạo hóa đơn mẫu (Sửa ExpenseStatus.UNPAID)
+    private void initExpenses() {
+        if (expenseRepository.count() == 0) {
+            Optional<User> badungOpt = userRepository.findByUsername("badung");
+            Optional<User> tiendatOpt = userRepository.findByUsername("tiendat");
+
+            if (badungOpt.isPresent() && tiendatOpt.isPresent()) {
+                Expense expense = Expense.builder()
+                        .totalAmount(new BigDecimal("350000"))
+                        .payer(badungOpt.get())
+                        .status(ExpenseStatus.UNPAID)
+                        .build();
+
+                expenseRepository.save(expense);
+                log.info("Đã khởi tạo hóa đơn mẫu cho tính năng VietQR.");
+            }
         }
     }
 }
