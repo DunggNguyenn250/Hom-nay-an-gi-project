@@ -10,6 +10,7 @@ import org.example.homnayangi.dto.response.RoomResponse;
 import org.example.homnayangi.dto.response.UserResponse;
 import org.example.homnayangi.entity.*;
 import org.example.homnayangi.enums.RoomStatus;
+import org.example.homnayangi.enums.RoomType;
 import org.example.homnayangi.exception.AppException;
 import org.example.homnayangi.exception.ErrorCode;
 import org.example.homnayangi.helper.RedisLockHelper;
@@ -61,6 +62,8 @@ public class RoomService {
                 .longitude(request.getLongitude())
                 .radius(request.getRadius() != null ? request.getRadius() : 5.0)
                 .deckSize(request.getDeckSize() != null ? request.getDeckSize() : 15)
+                .maxMembers(request.getMaxMembers() != null ? request.getMaxMembers() : 4)
+                .roomType(request.getRoomType() != null ? request.getRoomType() : RoomType.PRIVATE)
                 .host(host)
                 .status(RoomStatus.OPEN)
                 .roomCode(generateUniqueRoomCode())
@@ -99,6 +102,12 @@ public class RoomService {
             throw new AppException(ErrorCode.USER_ALREADY_IN_ROOM);
         }
 
+        // Kiểm tra sức chứa tối đa của phòng
+        long currentMembers = roomMemberRepository.countById_RoomId(room.getId());
+        if (room.getMaxMembers() != null && currentMembers >= room.getMaxMembers()) {
+            throw new AppException(ErrorCode.ROOM_FULL);
+        }
+
         RoomMember newMember = RoomMember.builder()
                 .id(roomMemberId)
                 .room(room)
@@ -124,9 +133,13 @@ public class RoomService {
                 .sorted((r1, r2) -> r2.getCreatedAt().compareTo(r1.getCreatedAt()))
                 .toList();
 
-        // Map trực tiếp từ Room sang RoomResponse (members sẽ là null/rỗng)
+        // Map trực tiếp từ Room sang RoomResponse (kèm số lượng thành viên hiện tại)
         return rooms.stream()
-                .map(roomMapper::toRoomResponse)
+                .map(room -> {
+                    RoomResponse resp = roomMapper.toRoomResponse(room);
+                    resp.setCurrentMembers((int) roomMemberRepository.countById_RoomId(room.getId()));
+                    return resp;
+                })
                 .toList();
     }
 
@@ -151,6 +164,7 @@ public class RoomService {
 
         RoomResponse response = roomMapper.toRoomResponse(room);
         response.setMembers(memberResponses);
+        response.setCurrentMembers(memberResponses.size());
 
         return response;
     }
