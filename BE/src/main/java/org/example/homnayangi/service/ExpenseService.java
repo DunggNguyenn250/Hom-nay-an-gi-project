@@ -43,6 +43,7 @@ public class ExpenseService {
     private final RedisLockHelper redisLockHelper;
     private final VietQRHelper vietQRHelper;
     private final PlatformTransactionManager transactionManager;
+    private final SocketService socketService;
 
     // =========================================================================
     // 1. TẠO HÓA ĐƠN
@@ -153,7 +154,9 @@ public class ExpenseService {
         // 7. Lưu Expense (CascadeType.ALL tự động lưu toàn bộ items, sharers và splits)
         Expense savedExpense = expenseRepository.save(expense);
 
-        return toEnrichedExpenseResponse(savedExpense);
+        ExpenseResponse response = toEnrichedExpenseResponse(savedExpense);
+        socketService.sendExpenseCreated(room.getId(), response);
+        return response;
     }
 
     // =========================================================================
@@ -280,6 +283,9 @@ public class ExpenseService {
         User debtor = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        ExpenseResponse response = toEnrichedExpenseResponse(expense);
+        socketService.sendExpenseUpdated(expense.getRoom().getId(), response);
+
         return ExpenseSplitResponse.builder()
                 .expenseId(expenseId)
                 .user(userMapper.toUserResponse(debtor))
@@ -318,7 +324,9 @@ public class ExpenseService {
 
         // 4. Lưu và trả về DTO
         Expense savedExpense = expenseRepository.save(expense);
-        return toEnrichedExpenseResponse(savedExpense);
+        ExpenseResponse response = toEnrichedExpenseResponse(savedExpense);
+        socketService.sendExpenseUpdated(expense.getRoom().getId(), response);
+        return response;
     }
 
     // =========================================================================
@@ -347,6 +355,7 @@ public class ExpenseService {
         }
 
         expenseRepository.delete(expense);
+        socketService.sendExpenseDeleted(expense.getRoom().getId(), expenseId);
     }
 
     // =========================================================================

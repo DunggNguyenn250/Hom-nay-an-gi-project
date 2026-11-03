@@ -71,6 +71,9 @@ public class MatchmakingService {
         User currentUser = getCurrentUser();
         UUID currentUserId = currentUser.getId();
 
+        // Xóa kết quả ghép cũ khi người dùng bắt đầu tìm kiếm mới.
+        redisTemplate.delete(RESULT_PREFIX + currentUserId);
+
         double userLat = request.getLatitude() != null ? request.getLatitude().doubleValue() : 21.0;
         double userLon = request.getLongitude() != null ? request.getLongitude().doubleValue() : 105.0;
         double userRadius = (request.getRadius() != null && request.getRadius() > 0) ? request.getRadius() : 5.0;
@@ -111,7 +114,17 @@ public class MatchmakingService {
 
             MatchmakingStatusResponse cachedResult = getMatchResult(currentUserId);
             if (cachedResult != null) {
-                return cachedResult;
+                if (cachedResult.getRoomId() != null) {
+                    Room room = roomRepository.findById(cachedResult.getRoomId()).orElse(null);
+                    if (room == null || room.getStatus() == RoomStatus.CLOSED) {
+                        log.warn("Phòng {} trong kết quả ghép cũ không còn tồn tại hoặc đã đóng, xóa cache Redis", cachedResult.getRoomId());
+                        redisTemplate.delete(RESULT_PREFIX + currentUserId);
+                        cachedResult = null;
+                    }
+                }
+                if (cachedResult != null) {
+                    return cachedResult;
+                }
             }
 
             MatchTicket ticket = getTicket(currentUserId);
