@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.example.homnayangi.dto.response.ExpenseResponse;
 import org.example.homnayangi.dto.response.MatchmakingStatusResponse;
 import org.example.homnayangi.dto.response.PlaceResponse;
 import org.example.homnayangi.dto.response.SocketEvent;
@@ -123,6 +124,36 @@ public class SocketService {
                 .data(Map.of("message", "Phòng ăn đã đóng."))
                 .build();
 
+        sendToRoom(roomId, event);
+    }
+
+    public void sendExpenseCreated(UUID roomId, ExpenseResponse expense) {
+        SocketEvent<Object> event = SocketEvent.builder()
+                .type("EXPENSE_CREATED")
+                .roomId(roomId)
+                .timestamp(LocalDateTime.now())
+                .data(expense)
+                .build();
+        sendToRoom(roomId, event);
+    }
+
+    public void sendExpenseUpdated(UUID roomId, ExpenseResponse expense) {
+        SocketEvent<Object> event = SocketEvent.builder()
+                .type("EXPENSE_UPDATED")
+                .roomId(roomId)
+                .timestamp(LocalDateTime.now())
+                .data(expense)
+                .build();
+        sendToRoom(roomId, event);
+    }
+
+    public void sendExpenseDeleted(UUID roomId, UUID expenseId) {
+        SocketEvent<Object> event = SocketEvent.builder()
+                .type("EXPENSE_DELETED")
+                .roomId(roomId)
+                .timestamp(LocalDateTime.now())
+                .data(Map.of("expenseId", expenseId.toString()))
+                .build();
         sendToRoom(roomId, event);
     }
 
